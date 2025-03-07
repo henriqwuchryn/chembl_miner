@@ -81,12 +81,12 @@ if select_variance == 1:
         variance_threshold = 0.1
     descriptors_df = mmm.remove_low_variance_columns(descriptors_df, variance_threshold)
     output_filename = mmm.generate_unique_filename(datasets_path,
-                                                filename[:-4],
+                                                filename[:-6],
                                                 f'FP{fingerprint_index}',
                                                 f'VT{variance_threshold}')
 else:
     output_filename = mmm.generate_unique_filename(datasets_path,
-                                                filename[:-4],
+                                                filename[:-6],
                                                 f'FP{fingerprint_index}')
 
 fingerprint_df = pd.concat([

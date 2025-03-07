@@ -14,7 +14,7 @@ def generate_unique_filename(base_path, base_name, tag_one='', tag_two=''):
     if tag_two != '':
       tag_two = '_'+tag_two
     while True:
-        output_filename = f'{base_path}/{base_name}{tag_one}{tag_two}{counter}.csv'
+        output_filename = f'{base_path}/{base_name}{tag_one}{tag_two}_{counter}.csv'
         if not os.path.exists(output_filename):
             return output_filename
         counter += 1
