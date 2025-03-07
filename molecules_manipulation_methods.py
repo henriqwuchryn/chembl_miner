@@ -6,6 +6,19 @@ from rdkit.Chem import Descriptors, Lipinski
 from sklearn.feature_selection import VarianceThreshold
 
 
+def generate_unique_filename(base_path, base_name, tag_one='', tag_two=''):
+    counter = 1
+    if tag_one != '':
+      tag_one = '_'+tag_one
+    if tag_two != '':
+      tag_two = '_'+tag_two
+    while True:
+        output_filename = f'{base_path}/{base_name}{tag_one}{tag_two}{counter}.csv'
+        if not os.path.exists(output_filename):
+            return output_filename
+        counter += 1
+
+
 def check_if_int (input, default_output=0):
   """will check if input can be parsed as an integer. if so, will return the integer, and if not, will return defaul_output"""
   try:

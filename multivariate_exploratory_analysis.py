@@ -37,7 +37,7 @@ features_df = fingerprint_df.drop(['molecule_chembl_id',
                                     'bioactivity_class'],
                                     axis=1)
 
-n_components = input('Choose how many principal components to compute')
+n_components = input('\nChoose how many principal components to compute\n')
 n_components = mmm.check_if_int(n_components,10)
 principal_components_colnames = []
 
@@ -52,7 +52,7 @@ pca_df = pd.DataFrame(data=principal_components,
 pca_df_classes = pd.concat([pca_df,
                         fingerprint_df['bioactivity_class']],
                         axis=1)
-print('Principal components explained variance: ',
+print('\nPrincipal components explained variance: ',
     pca.explained_variance_ratio_,
     '\n')
 print('Principal components total explained variance: ',
@@ -71,8 +71,9 @@ plt.title('Figure 1: Scree Plot for Proportion of Variance Explained',
           size = 25)
 plt.grid(True)
 plt.savefig(f'{results_path}/scree_plot-{n_components}_components.svg', bbox_inches="tight")
-plot_pcs = input("""Are you ok with the amount of principal components?
-Press 1 to plot every combination possible""")
+print(f'\nScree plot saved at f{results_path}/scree_plot-{n_components}_components.svg')
+plot_pcs = input("""\nAre you ok with the amount of principal components?
+Press 1 to plot every combination possible\n""")
 plot_pcs = mmm.check_if_int(plot_pcs)
 
 if plot_pcs == 1:

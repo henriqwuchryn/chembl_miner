@@ -65,6 +65,7 @@ else:
     print('\nReutilizing descriptors.csv file')
 
 descriptors_df = pd.read_csv('descriptors.csv')
+descriptors_df = descriptors_df.drop('Name',axis=1)
 select_variance = input('\nType 1 to remove descriptors with low variance\n')
 select_variance = mmm.check_if_int(select_variance)
 
@@ -79,9 +80,14 @@ if select_variance == 1:
         print('\nNot a number. Using default value of 0.1')
         variance_threshold = 0.1
     descriptors_df = mmm.remove_low_variance_columns(descriptors_df, variance_threshold)
-    output_filename = f'{datasets_path}/{filename}-{fingerprint[12:-4]}-variance_filtered_{variance_threshold}.csv'
+    output_filename = mmm.generate_unique_filename(datasets_path,
+                                                filename[:-4],
+                                                f'FP{fingerprint_index}',
+                                                f'VT{variance_threshold}')
 else:
-    output_filename = f'{datasets_path}/{filename}-{fingerprint[12:-4]}.csv'
+    output_filename = mmm.generate_unique_filename(datasets_path,
+                                                filename[:-4],
+                                                f'FP{fingerprint_index}')
 
 fingerprint_df = pd.concat([
     activity_df['molecule_chembl_id'],

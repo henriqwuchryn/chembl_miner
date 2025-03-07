@@ -5,7 +5,9 @@ import molecules_manipulation_methods as mmm
 from plyer import notification
 import os
 import sys
+
 datasets_path = 'datasets'
+
 if not os.path.exists(datasets_path):
     os.mkdir(datasets_path)
 
@@ -75,7 +77,7 @@ for i in activity_df.standard_value:
         bioactivity_class.append("intermediate")
         
 activity_df['bioactivity_class'] = bioactivity_class
-output_filename = f'datasets/{target_chembl_id}_{activity_type}.csv'
+output_filename = mmm.generate_unique_filename(datasets_path, target_chembl_id, activity_type)
 activity_df.to_csv(output_filename, index=False)
 print(activity_df)
 print('\n Output filename is ', output_filename)
