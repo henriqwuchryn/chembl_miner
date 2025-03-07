@@ -47,28 +47,16 @@ features_df = fingerprint_df.drop(['molecule_chembl_id',
                                     axis=1)
 target_df = fingerprint_df['neg_log_value']
 data_df = pd.concat([features_df,target_df],axis=1)
-x_train, x_test, y_train, y_test = train_test_split(features_df,
-                                                    target_df,
-                                                    test_size=0.2,
-                                                    random_state=random_state)
-# print(f'Number of features is: {features_df.shape[1]}')
-# print(f'Number of samples is: {features_df.shape[0]}')
-# print(f'size of train set is: {x_train.shape[0]}')
-# print(f'size of test set is: {x_test.shape[0]}')
 compare = input('\nDo you want to compare models? 1 or 0\n')
 compare = mmm.check_if_int(compare)
+
 if compare == 1:
     regression_setup = regression.setup(data=data_df,
                                         target='neg_log_value',
                                         train_size=0.8)
-    compare_models = regression.compare_models()
-
-BaggingRegressor
-from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.ensemble import RandomForestRegressor
-from xgboost import XGBRegressor
-from lightgbm import LGBMRegressor
-
+    compare_models = regression.compare_models(turbo=False,fold=10)
+    print(regression.get_metrics())
+    
 algorithms: dict = {'01':Bagging(),
                     '02':GradientBoosting(),
                     '03':LGBM(),
@@ -76,6 +64,7 @@ algorithms: dict = {'01':Bagging(),
                     '05':XGB()}
 print('\n',pd.DataFrame(algorithms.items(),columns=['Index','Algorithm']),'\n')
 algorithm_index :str = input('Choose which algorithm to use by inserting the index\n')
+
 try:
     algorithm_index = int(algorithm_index)
 except:
@@ -85,3 +74,12 @@ try:
     algorithm = list(algorithms.values())[algorithm_index]
 except:
     print('\nIndex unavailable')
+
+x_train, x_test, y_train, y_test = train_test_split(features_df,
+                                                    target_df,
+                                                    test_size=0.2,
+                                                    random_state=random_state)
+print(f'Number of features is: {features_df.shape[1]}')
+print(f'Number of samples is: {features_df.shape[0]}')
+print(f'size of train set is: {x_train.shape[0]}')
+print(f'size of test set is: {x_test.shape[0]}')
