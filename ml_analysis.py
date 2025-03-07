@@ -15,6 +15,7 @@ from lightgbm import LGBMRegressor
 from sklearn.model_selection import cross_validate, cross_val_score
 random_state = 42
 sns.set_theme(style='whitegrid',font='liberation serif')
+import molecules_manipulation_methods as mmm
 import os
 import sys
 
@@ -54,14 +55,15 @@ if compare == 1:
     regression_setup = regression.setup(data=data_df,
                                         target='neg_log_value',
                                         train_size=0.8)
-    compare_models = regression.compare_models(turbo=False,fold=10)
+    compare_models = regression.compare_models(turbo=True,fold=10)
     print(regression.get_metrics())
     
-algorithms: dict = {'01':Bagging(),
-                    '02':GradientBoosting(),
-                    '03':LGBM(),
-                    '04':RandomForest(),
-                    '05':XGB()}
+
+algorithms: dict = {'01':BaggingRegressor(),
+                    '02':GradientBoostingRegressor(),
+                    '03':LGBMRegressor(),
+                    '04':RandomForestRegressor(),
+                    '05':XGBRegressor()}
 print('\n',pd.DataFrame(algorithms.items(),columns=['Index','Algorithm']),'\n')
 algorithm_index :str = input('Choose which algorithm to use by inserting the index\n')
 
