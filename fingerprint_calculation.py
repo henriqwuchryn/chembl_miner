@@ -65,6 +65,7 @@ else:
     print('\nReutilizing descriptors.csv file')
 
 descriptors_df = pd.read_csv('descriptors.csv')
+descriptors_df = descriptors_df.drop('Name',axis=1)
 select_variance = input('\nType 1 to remove descriptors with low variance\n')
 select_variance = mmm.check_if_int(select_variance)
 
