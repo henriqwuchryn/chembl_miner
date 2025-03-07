@@ -1,6 +1,7 @@
 from chembl_webresource_client.new_client import new_client
 import pandas as pd
 import numpy as np
+import os
 from rdkit import Chem
 from rdkit.Chem import Descriptors, Lipinski
 from sklearn.feature_selection import VarianceThreshold

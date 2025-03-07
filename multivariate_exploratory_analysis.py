@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 sns.set_theme(style='ticks')
-sns.set_theme(style='whitegrid',font='times new roman')
+sns.set_theme(style='whitegrid',font='liberation serif')
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 import os
@@ -13,12 +13,12 @@ try:
     filename = sys.argv[1]
 except:
     print(
-        '''you must insert the dataset filename as an argument, like this:
+        '''\nyou must insert the dataset filename as an argument, like this:
     >python multivariate_exploratory_analysis.py FILENAME.csv'''
     )
     quit()
 
-results_path = f'analysis/{filename}'
+results_path = f'analysis/{filename[:-4]}'
 datasets_path = 'datasets'
 
 try:
@@ -95,8 +95,9 @@ if plot_pcs == 1:
                     fontsize=16)
         plt.savefig(f'{results_path}/pca_{str(a)}_{str(b)}.svg',bbox_inches='tight')
         plt.close()
-
+    print('\nPlotting every combination of principal components')
     for i in range (n_components):
         for j in range (n_components):
             if i != j:
                 PcaGrapher(i+1,j+1,cryptococcus_pca)
+print('\nDone')

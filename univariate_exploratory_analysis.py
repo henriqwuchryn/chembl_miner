@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 sns.set_theme(style='ticks')
-sns.set_theme(style='whitegrid',font='times new roman')
+sns.set_theme(style='whitegrid',font='liberation serif')
 import matplotlib.pyplot as plt
 import molecules_manipulation_methods as mmm
 import os
@@ -12,21 +12,21 @@ try:
     filename = sys.argv[1]
 except:
     print(
-        '''you must insert the dataset filename as an argument, like this:
+        '''\nyou must insert the dataset filename as an argument, like this:
     >python univariate_exploratory_analysis.py FILENAME.csv'''
     )
     quit()
 
-results_path = f'analysis/{filename}'
+results_path = f'analysis/{filename[:-4]}'
 datasets_path = 'datasets'
 
 try:
     activity_df = pd.read_csv(f'{datasets_path}/{filename}')
 except:
     if not os.path.exists(f'{datasets_path}/{filename}'):
-        print('File does not exist')
+        print('\nFile does not exist')
     else:
-        print('Invalid file - cannot convert to dataframe')
+        print('\nInvalid file - cannot convert to dataframe')
     quit()
 if not os.path.exists(results_path):
     os.makedirs(results_path)
