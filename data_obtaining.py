@@ -24,7 +24,7 @@ except:
     print('\nThe ID might be invalid. Please note that it is case-sensitive\nExiting')
     quit()
 
-activity_type :list[str] = input("\nChoose which type of result to obtain.")
+activity_type :list[str] = input("\nChoose which type of result to obtain.\n")
 print('\nFiltering for type')
 activity_query = activity_query.filter(standard_type=activity_type)
 activity_df : pd.DataFrame = pd.DataFrame(activity_query)
@@ -80,5 +80,5 @@ activity_df['bioactivity_class'] = bioactivity_class
 output_filename = mmm.generate_unique_filename(datasets_path, target_chembl_id, activity_type)
 activity_df.to_csv(output_filename, index=False)
 print(activity_df)
-print('\n Output filename is ', output_filename)
+print('\nOutput filename is ', output_filename)
 
