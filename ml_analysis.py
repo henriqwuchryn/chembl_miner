@@ -15,6 +15,7 @@ from lightgbm import LGBMRegressor
 from sklearn.model_selection import cross_validate, cross_val_score
 random_state = 42
 sns.set_theme(style='whitegrid',font='liberation serif')
+import molecules_manipulation_methods.py as mmm
 import os
 import sys
 
