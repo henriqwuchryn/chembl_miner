@@ -39,12 +39,15 @@ except:
 if not os.path.exists(results_path):
     os.makedirs(results_path)
 
+fingerprint_df.replace([np.inf, -np.inf], np.nan, inplace=True)
+fingerprint_df.dropna(inplace=True)
+fingerprint_df.reset_index(drop=True, inplace=True)
 features_df = fingerprint_df.drop(['molecule_chembl_id',
                                     'neg_log_value',
                                     'bioactivity_class'],
                                     axis=1)
 target_df = fingerprint_df['neg_log_value']
-x_train, x_test, y_train, y_test = train_test_split(features_df,
+x_train, x_test, y_train, y_test = model_selection.train_test_split(features_df,
                                                     target_df,
                                                     test_size=0.2,
                                                     random_state=random_state)
@@ -78,7 +81,7 @@ algorithms: dict = {1:('BaggingRegressor',BaggingRegressor(random_state=random_s
                     }
 print('\n',pd.DataFrame([(key, value[0]) for key, value in algorithms.items()],columns=['Index','Algorithm']),'\n')
 algorithm_index :str = input('Choose which algorithm to use by inserting the index. 0 for all.\n')
-algorithm_index = check_if_int(algorithm_index)
+algorithm_index = mmm.check_if_int(algorithm_index)
 
 if algorithm_index != 0:
     try:
@@ -91,9 +94,9 @@ else:
 
 
 scoring = {
-    'r2': metrics.make_scorer(r2_score),
-    'rmse': metrics.make_scorer(lambda y_true, y_pred: mean_squared_error(y_true, y_pred)),
-    'mae': metrics.make_scorer(mean_absolute_error)
+    'r2': metrics.make_scorer(metrics.r2_score),
+    'rmse': metrics.make_scorer(lambda y_true, y_pred: metrics.mean_squared_error(y_true, y_pred)),
+    'mae': metrics.make_scorer(metrics.mean_absolute_error)
 }
 param_grids = {
     'BaggingRegressor': {
@@ -168,14 +171,17 @@ param_grids = {
     }
 }
 
+print(target_df.describe())
+
 ##BELOW IS AI GENERATED, IN REVIEW
 
-def evaluate_and_optimize(model, param_grid, X_train, y_train, X_test, y_test, algorithm_name, scoring):
+def evaluate_and_optimize(model, param_grid, X_train, y_train, X_test, y_test, algorithm_name):
     print(f"\nOptimizing {algorithm_name}...")
     
     # Use GridSearchCV for parameter optimization
-    grid_search = model_selection.GridSearchCV(estimator=model, param_grid=param_grid, cv=5, scoring=scoring, n_jobs=-1)
+    grid_search = model_selection.GridSearchCV(estimator=model, param_grid=param_grid)
     grid_search.fit(X_train, y_train)
+    print(grid_search.cv_results_)
     
     # Get the best model
     best_model = grid_search.best_estimator_
@@ -221,8 +227,8 @@ else:
 
 # Save results to CSV
 results_df = pd.DataFrame(results_list)
-results_filename = f'{results_path}/optimization_results.csv'
-results_df.to_csv(results_filename, index=False)
+# results_filename = f'{results_path}/optimization_results.csv'
+# results_df.to_csv(results_filename, index=False)
 
 print(f"\nOptimization completed. Results saved to {results_filename}.")
 print(results_df)
