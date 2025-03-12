@@ -227,8 +227,8 @@ else:
 
 # Save results to CSV
 results_df = pd.DataFrame(results_list)
-# results_filename = f'{results_path}/optimization_results.csv'
-# results_df.to_csv(results_filename, index=False)
+results_filename = f'{results_path}/optimization_results.csv'
+results_df.to_csv(results_filename, index=False)
 
 print(f"\nOptimization completed. Results saved to {results_filename}.")
 print(results_df)
