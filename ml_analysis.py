@@ -55,21 +55,6 @@ print(f'Number of features is: {features_df.shape[1]}')
 print(f'Number of samples is: {features_df.shape[0]}')
 print(f'size of train set is: {x_train.shape[0]}')
 print(f'size of test set is: {x_test.shape[0]}')
-
-#PYCARET COMPARE MODELS WAS NOT WORKING PROPERLY, WON'T BE USING IT
-
-# compare = input('\nDo you want to compare models? 1 or 0\n')
-# compare = mmm.check_if_int(compare)
-
-# if compare == 1:
-#     data_df = pd.concat([features_df,target_df],axis=1)
-#     regression_setup = regression.setup(data=data_df,
-#                                         target='neg_log_value',
-#                                         train_size=0.8)
-#     compare_models = regression.compare_models(turbo=True,fold=10)
-#     print(regression.get_metrics())
-    
-
 algorithms: dict = {1:('BaggingRegressor',BaggingRegressor(random_state=random_state)),
                     2:('GradientBoostingRegressor',GradientBoostingRegressor(random_state=random_state)),
                     3:('LGBMRegressor',LGBMRegressor(random_state=random_state)),
@@ -88,16 +73,23 @@ if algorithm_index != 0:
         algorithm = algorithms[algorithm_index]
         print('\nAlgorithm chosen:',algorithm)
     except:
-        print('\nIndex unavailable')
+        print('\nIndex does not correspond to an algorithm')
+        quit()
 else:
-    print('\nAll algorithms will be used')
-
+    confirmation = input('\nAre you sure you want to use all algorithms? 1 or 0\n')
+    confirmation = mmm.check_if_int(confirmation)
+    if confirmation == 1:
+        print('\nAll algorithms will be used')
+    else:
+        print('\nIndex does not correspond to an algorithm')
+        quit()         
 
 scoring = {
     'r2': metrics.make_scorer(metrics.r2_score),
     'rmse': metrics.make_scorer(lambda y_true, y_pred: metrics.mean_squared_error(y_true, y_pred)),
     'mae': metrics.make_scorer(metrics.mean_absolute_error)
 }
+#dict structure: name, param_grid
 param_grids = {
     'BaggingRegressor': {
         'n_estimators': [10, 20, 40],#10
@@ -173,62 +165,30 @@ param_grids = {
 
 print(target_df.describe())
 
-##BELOW IS AI GENERATED, IN REVIEW
 
-def evaluate_and_optimize(model, param_grid, X_train, y_train, X_test, y_test, algorithm_name):
-    print(f"\nOptimizing {algorithm_name}...")
-    
-    # Use GridSearchCV for parameter optimization
-    grid_search = model_selection.GridSearchCV(estimator=model, param_grid=param_grid)
-    grid_search.fit(X_train, y_train)
-    print(grid_search.cv_results_)
-    
-    # Get the best model
-    best_model = grid_search.best_estimator_
-    
-    # Evaluate on test set
-    y_pred = best_model.predict(X_test)
-    r2 = r2_score(y_test, y_pred)
-    rmse = mean_squared_error(y_test, y_pred, squared=False)
-    mae = mean_absolute_error(y_test, y_pred)
-    
-    # Save results
-    results = {
-        'Algorithm': algorithm_name,
-        'Best Parameters': grid_search.best_params_,
-        'Test R2': r2,
-        'Test RMSE': rmse,
-        'Test MAE': mae
-    }
-    
-    # Save model to file
-    model_filename = f'{results_path}/{algorithm_name}_best_model.pkl'
-    joblib.dump(best_model, model_filename)
-    print(f"Best model saved to {model_filename}")
-    
+def evaluate_and_optimize(algorithm, param_grid, X_train, y_train, X_test, y_test, algorithm_name):
+    print(f"\nOptimizing {algorithm_name}")
+    print(f"Parameters: {param_grid}")
+    grid_search = model_selection.GridSearchCV(estimator=model,
+                                            param_grid=param_grid,
+                                            scoring=scoring,
+                                            refit='r2')
+    print('\nFitting\n')
+    grid_search.fit(X_train, y_train)                                   
+    results = pd.DataFrame(grid_search.cv_results_)
+    print(f'Results:\n{results}')
+    print(f'\nBest parameters:\n{grid_search.best_params_}')
+    print(f'\nBest score indes:\n{grid_search.best_index_}')
+    results.to_csv(f'{results_path}/{algorithm_name}_GridSearch.csv', index=False)
     return results
 
-# Evaluate selected algorithm(s)
-results_list = []
 
-if algorithm_index == 0:
-    # Evaluate all algorithms
-    for idx, (name, model) in algorithms.items():
-        results = evaluate_and_optimize(model, param_grids[name], x_train, y_train, x_test, y_test, name)
-        results_list.append(results)
+if algorithm_index == 0 and confirmation == 1:
+    for index, (name, algorithm) in algorithms.items():
+        results = evaluate_and_optimize(algorithm, param_grids[name], x_train, y_train, name)
 else:
-    # Evaluate the selected algorithm
-    if algorithm_index in algorithms:
-        name, model = algorithms[algorithm_index]
-        results = evaluate_and_optimize(model, param_grids[name], x_train, y_train, x_test, y_test, name)
-        results_list.append(results)
-    else:
-        print('\nIndex unavailable')
+    name, algorithm = algorithms[algorithm_index]
+    results = evaluate_and_optimize(algorithm, param_grids[name], x_train, y_train, name)
+    results_list.append(results)
 
-# Save results to CSV
-results_df = pd.DataFrame(results_list)
-results_filename = f'{results_path}/optimization_results.csv'
-results_df.to_csv(results_filename, index=False)
-
-print(f"\nOptimization completed. Results saved to {results_filename}.")
-print(results_df)
+print(f"\nOptimization completed. Results saved to {results_path}.")

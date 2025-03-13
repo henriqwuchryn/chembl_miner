@@ -61,7 +61,7 @@ for i in activity_df.standard_value:
         bioactivity_class.append("intermediate")
         
 activity_df['bioactivity_class'] = bioactivity_class
-output_filename = mmm.generate_unique_filename(datasets_path, target_chembl_id, activity_type)
+output_filename = mmm.generate_unique_csv(datasets_path, target_chembl_id, activity_type)
 activity_df.to_csv(output_filename, index=False)
 print(activity_df)
 print('\nOutput filename is ', output_filename, ' in the datasets folder')
