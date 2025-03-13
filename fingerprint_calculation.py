@@ -1,7 +1,6 @@
 import pandas as pd
 import glob
 from padelpy import padeldescriptor, from_smiles
-from plyer import notification
 import miscelanneous_methods as mm
 import os
 import sys

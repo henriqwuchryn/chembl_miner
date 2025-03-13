@@ -165,13 +165,13 @@ if optimize == 1:
     }
     if algorithm_index == 0 and confirmation == 1:
         for index, (name, algorithm) in algorithms.items():
-            search_cv_results, best_params = evaluate_and_optimize(
+            search_cv_results, best_params = mlm.evaluate_and_optimize(
                 algorithm, param_grids[name], x_train, y_train, name)
             search_output_filename = mm.generate_unique_filename(
                 results_path, name, 'GridSearch')
             search_cv_results.to_csv(search_output_filename, index=False)
     else:
-        search_cv_results, best_params = evaluate_and_optimize(
+        search_cv_results, best_params = mlm.evaluate_and_optimize(
             algorithm[1], param_grids[algorithm[0]], x_train, y_train, algorithm[0])
         search_output_filename = mm.generate_unique_filename(
             results_path, algorithm[0], 'GridSearch')
@@ -195,7 +195,7 @@ except:
 
 optimized_algorithm = algorithm[1].set_params(**params)
 print('\nPerforming supervised outlier removal')
-x_train_clean, y_train_clean, cv_score = supervised_outlier_removal(
+x_train_clean, y_train_clean, cv_score = mlm.supervised_outlier_removal(
     algorithm=optimized_algorithm, x_train=x_train, y_train= y_train,
     scoring=scoring, algorithm_name=algorithm[0])
 r2_cv = cv_score['test_r2'].mean()

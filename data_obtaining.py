@@ -1,5 +1,6 @@
 import os
 import sys
+import pandas as pd
 from chembl_webresource_client.new_client import new_client
 import molecules_manipulation_methods as mmm
 import miscelanneous_methods as mm
