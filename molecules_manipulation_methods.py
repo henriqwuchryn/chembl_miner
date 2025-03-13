@@ -7,7 +7,7 @@ from rdkit.Chem import Descriptors, Lipinski
 from sklearn.feature_selection import VarianceThreshold
 
 
-def generate_unique_filename(base_path, base_name, tag_one='', tag_two=''):
+def generate_unique_csv(base_path, base_name, tag_one='', tag_two=''):
     counter = 1
     if tag_one != '':
       tag_one = '_'+tag_one

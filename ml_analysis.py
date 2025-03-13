@@ -55,21 +55,6 @@ print(f'Number of features is: {features_df.shape[1]}')
 print(f'Number of samples is: {features_df.shape[0]}')
 print(f'size of train set is: {x_train.shape[0]}')
 print(f'size of test set is: {x_test.shape[0]}')
-
-#PYCARET COMPARE MODELS WAS NOT WORKING PROPERLY, WON'T BE USING IT
-
-# compare = input('\nDo you want to compare models? 1 or 0\n')
-# compare = mmm.check_if_int(compare)
-
-# if compare == 1:
-#     data_df = pd.concat([features_df,target_df],axis=1)
-#     regression_setup = regression.setup(data=data_df,
-#                                         target='neg_log_value',
-#                                         train_size=0.8)
-#     compare_models = regression.compare_models(turbo=True,fold=10)
-#     print(regression.get_metrics())
-    
-
 algorithms: dict = {1:('BaggingRegressor',BaggingRegressor(random_state=random_state)),
                     2:('GradientBoostingRegressor',GradientBoostingRegressor(random_state=random_state)),
                     3:('LGBMRegressor',LGBMRegressor(random_state=random_state)),
@@ -88,147 +73,122 @@ if algorithm_index != 0:
         algorithm = algorithms[algorithm_index]
         print('\nAlgorithm chosen:',algorithm)
     except:
-        print('\nIndex unavailable')
+        print('\nIndex does not correspond to an algorithm')
+        quit()
 else:
-    print('\nAll algorithms will be used')
-
+    confirmation = input('\nAre you sure you want to use all algorithms? 1 or 0\n')
+    confirmation = mmm.check_if_int(confirmation)
+    if confirmation == 1:
+        print('\nAll algorithms will be used')
+    else:
+        print('\nIndex does not correspond to an algorithm')
+        quit()         
 
 scoring = {
     'r2': metrics.make_scorer(metrics.r2_score),
     'rmse': metrics.make_scorer(lambda y_true, y_pred: metrics.mean_squared_error(y_true, y_pred)),
     'mae': metrics.make_scorer(metrics.mean_absolute_error)
 }
+#dict structure: name, param_grid
 param_grids = {
     'BaggingRegressor': {
-        'n_estimators': [10, 50, 100, 200],
-        'max_samples': [0.5, 0.8, 1.0],
-        'max_features': [0.5, 0.8, 1.0],
+        'n_estimators': [10, 20, 40],#10
+        'max_samples': [0.7, 1.0],#1.0
+        'max_features': [0.7, 1.0],#1.0
         'bootstrap': [True, False],  # Whether samples are drawn with replacement
         'bootstrap_features': [True, False]  # Whether features are drawn with replacement
     },
     'GradientBoostingRegressor': {
-        'n_estimators': [50, 100, 200, 300],
-        'learning_rate': [0.01, 0.05, 0.1, 0.2],
-        'max_depth': [3, 5, 7, 9],
-        'min_samples_split': [2, 5, 10],
-        'min_samples_leaf': [1, 2, 4],
-        'subsample': [0.8, 0.9, 1.0],  # Fraction of samples used for fitting
-        'max_features': ['auto', 'sqrt', 'log2']  # Number of features to consider for splits
+        'n_estimators': [100, 200, 400], #100
+        'learning_rate': [0.05, 0.1, 0.2], #0.1
+        'max_depth': [3, 5, 7], #3
+        'min_samples_split': [2, 4], #2
+        'min_samples_leaf': [1, 2], #1
+        'subsample': [0.7, 1.0],  # 1.0
+        'max_features': [1.0, 'sqrt', 'log2']  # 1.0
     },
     'LGBMRegressor': {
-        'n_estimators': [50, 100, 200, 300],
-        'learning_rate': [0.01, 0.05, 0.1, 0.2],
-        'max_depth': [3, 5, 7, 9],
-        'num_leaves': [31, 50, 100],  # Maximum number of leaves in one tree
-        'min_child_samples': [20, 50, 100],  # Minimum number of data in one leaf
-        'subsample': [0.8, 0.9, 1.0],  # Fraction of samples used for fitting
-        'colsample_bytree': [0.8, 0.9, 1.0],  # Fraction of features used for fitting
-        'reg_alpha': [0, 0.1, 1],  # L1 regularization
-        'reg_lambda': [0, 0.1, 1]  # L2 regularization
+        'n_estimators': [100, 200, 400], #100
+        'learning_rate': [0.05, 0.1, 0.2],#0.1
+        'max_depth': [-1, 6, 9],#-1
+        'num_leaves': [31, 62],#62
+        'min_child_samples': [20, 40],#40
+        'subsample': [0.7, 1.0],  # Fraction of samples used for fitting
+        'colsample_bytree': [0.7, 1.0],  # Fraction of features used for fitting
+        'reg_alpha': [0, 0.1],  # L1 regularization
+        'reg_lambda': [0, 0.1]  # L2 regularization
     },
     'RandomForestRegressor': {
-        'n_estimators': [50, 100, 200, 300],
-        'max_depth': [3, 5, 7, 9, None],
-        'min_samples_split': [2, 5, 10],
-        'min_samples_leaf': [1, 2, 4],
-        'max_features': ['auto', 'sqrt', 'log2'],  # Number of features to consider for splits
+        'n_estimators': [100, 200, 400], #100
+        'max_depth': [6, 9, None], #None
+        'min_samples_split': [2, 4], #2
+        'min_samples_leaf': [1, 2], #1
+        'max_features': [1.0, 'sqrt', 'log2'],  # 1.0
         'bootstrap': [True, False],  # Whether bootstrap samples are used
         'oob_score': [True, False]  # Whether to use out-of-bag samples for estimation
     },
     'XGBRegressor': {
         'n_estimators': [50, 100, 200, 300],
-        'learning_rate': [0.01, 0.05, 0.1, 0.2],
-        'max_depth': [3, 5, 7, 9],
-        'min_child_weight': [1, 5, 10],  # Minimum sum of instance weight needed in a child
-        'gamma': [0, 0.1, 0.2],  # Minimum loss reduction required to make a split
-        'subsample': [0.8, 0.9, 1.0],  # Fraction of samples used for fitting
-        'colsample_bytree': [0.8, 0.9, 1.0],  # Fraction of features used for fitting
-        'reg_alpha': [0, 0.1, 1],  # L1 regularization
-        'reg_lambda': [0, 0.1, 1]  # L2 regularization
+        'learning_rate': [0.15, 0.3, 0.6],
+        'max_depth': [3, 6, 9],
+        'min_child_weight': [1, 2],  # Minimum sum of instance weight needed in a child
+        'gamma': [0, 0.1],  # Minimum loss reduction required to make a split
+        'subsample': [0.7, 1.0],  # Fraction of samples used for fitting
+        'colsample_bytree': [0.7, 1.0],  # Fraction of features used for fitting
+        'reg_alpha': [0, 0.1],  # L1 regularization
+        'reg_lambda': [0, 0.1]  # L2 regularization
     },
     'HistGradientBoostingRegressor': {
-        'max_iter': [50, 100, 200, 300],
-        'learning_rate': [0.01, 0.05, 0.1, 0.2],
-        'max_depth': [3, 5, 7, 9],
-        'min_samples_leaf': [1, 2, 4, 10],
-        'max_leaf_nodes': [31, 50, 100],  # Maximum number of leaves
-        'l2_regularization': [0, 0.1, 1],  # L2 regularization
-        'max_bins': [128, 256, 512]  # Maximum number of bins for feature discretization
+        'max_iter': [100, 200, 400], #100
+        'learning_rate': [0.05, 0.1, 0.2], #0.1
+        'max_depth': [6, 9, None], #None
+        'min_samples_leaf': [20, 40], #20
+        'max_leaf_nodes': [31, 62],  #61
+        'l2_regularization': [0, 0.1],  #0
+        'max_bins': [255, 610]  #255
     },
     'ExtraTreesRegressor': {
-        'n_estimators': [50, 100, 200, 300],
-        'max_depth': [3, 5, 7, 9, None],
-        'min_samples_split': [2, 5, 10],
-        'min_samples_leaf': [1, 2, 4],
-        'max_features': ['auto', 'sqrt', 'log2'],  # Number of features to consider for splits
+        'n_estimators': [100, 200, 300], #100
+        'max_depth': [6, 9, None], #None
+        'min_samples_split': [2, 4], #2
+        'min_samples_leaf': [1, 2], #1
+        'max_features': [1.0, 'sqrt', 'log2'],  # Number of features to consider for splits
         'bootstrap': [True, False],  # Whether bootstrap samples are used
         'oob_score': [True, False]  # Whether to use out-of-bag samples for estimation
     },
     'AdaBoostRegressor': {
-        'n_estimators': [50, 100, 200, 300],
-        'learning_rate': [0.01, 0.05, 0.1, 0.2],
-        'loss': ['linear', 'square', 'exponential']  # Loss function to optimize
+        'n_estimators': [50, 100, 200], #50
+        'learning_rate': [0.5, 1.0, 2.0], #1.0
+        'loss': ['linear', 'square', 'exponential']  #linear
     }
 }
 
 print(target_df.describe())
 
-##BELOW IS AI GENERATED, IN REVIEW
 
-def evaluate_and_optimize(model, param_grid, X_train, y_train, X_test, y_test, algorithm_name):
-    print(f"\nOptimizing {algorithm_name}...")
-    
-    # Use GridSearchCV for parameter optimization
-    grid_search = model_selection.GridSearchCV(estimator=model, param_grid=param_grid)
-    grid_search.fit(X_train, y_train)
-    print(grid_search.cv_results_)
-    
-    # Get the best model
-    best_model = grid_search.best_estimator_
-    
-    # Evaluate on test set
-    y_pred = best_model.predict(X_test)
-    r2 = r2_score(y_test, y_pred)
-    rmse = mean_squared_error(y_test, y_pred, squared=False)
-    mae = mean_absolute_error(y_test, y_pred)
-    
-    # Save results
-    results = {
-        'Algorithm': algorithm_name,
-        'Best Parameters': grid_search.best_params_,
-        'Test R2': r2,
-        'Test RMSE': rmse,
-        'Test MAE': mae
-    }
-    
-    # Save model to file
-    model_filename = f'{results_path}/{algorithm_name}_best_model.pkl'
-    joblib.dump(best_model, model_filename)
-    print(f"Best model saved to {model_filename}")
-    
+def evaluate_and_optimize(algorithm, param_grid, X_train, y_train,algorithm_name):
+    print(f"\nOptimizing {algorithm_name}")
+    print(f"Parameters: {param_grid}")
+    grid_search = model_selection.GridSearchCV(estimator=algorithm,
+                                            param_grid=param_grid,
+                                            scoring=scoring,
+                                            refit='r2',
+                                            n_jobs=-1)
+    print('\nFitting\n')
+    grid_search.fit(X_train, y_train)                                   
+    results = pd.DataFrame(grid_search.cv_results_)
+    print(f'Results:\n{results}')
+    print(f'\nBest parameters:\n{grid_search.best_params_}')
+    print(f'\nBest score index:\n{grid_search.best_index_}')
+    results.to_csv(f'{results_path}/{algorithm_name}_GridSearch.csv', index=False)
     return results
 
-# Evaluate selected algorithm(s)
-results_list = []
 
-if algorithm_index == 0:
-    # Evaluate all algorithms
-    for idx, (name, model) in algorithms.items():
-        results = evaluate_and_optimize(model, param_grids[name], x_train, y_train, x_test, y_test, name)
-        results_list.append(results)
+if algorithm_index == 0 and confirmation == 1:
+    for index, (name, algorithm) in algorithms.items():
+        evaluate_and_optimize(algorithm, param_grids[name], x_train, y_train, name)
 else:
-    # Evaluate the selected algorithm
-    if algorithm_index in algorithms:
-        name, model = algorithms[algorithm_index]
-        results = evaluate_and_optimize(model, param_grids[name], x_train, y_train, x_test, y_test, name)
-        results_list.append(results)
-    else:
-        print('\nIndex unavailable')
+    name, algorithm = algorithms[algorithm_index]
+    evaluate_and_optimize(algorithm, param_grids[name], x_train, y_train, name)
 
-# Save results to CSV
-results_df = pd.DataFrame(results_list)
-results_filename = f'{results_path}/optimization_results.csv'
-results_df.to_csv(results_filename, index=False)
-
-print(f"\nOptimization completed. Results saved to {results_filename}.")
-print(results_df)
+print(f"\nOptimization completed. Results saved to {results_path}.")
