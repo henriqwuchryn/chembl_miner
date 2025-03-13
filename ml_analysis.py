@@ -78,7 +78,7 @@ else:
         print('\nAll algorithms will be used')
     else:
         print('\nIndex does not correspond to an algorithm')
-        quit()         
+        quit()
 
 scoring = {
     'r2': metrics.make_scorer(metrics.r2_score),
@@ -164,15 +164,15 @@ if optimize == 1:
         }
     }
     if algorithm_index == 0 and confirmation == 1:
-        for index, (name, algorithm) in algorithms.items():
+        for index, (name, alg) in algorithms.items():
             search_cv_results, best_params = mlm.evaluate_and_optimize(
-                algorithm, param_grids[name], x_train, y_train, name)
+                alg, param_grids[name], x_train, y_train, scoring, name)
             search_output_filename = mm.generate_unique_filename(
                 results_path, name, 'GridSearch')
             search_cv_results.to_csv(search_output_filename, index=False)
     else:
         search_cv_results, best_params = mlm.evaluate_and_optimize(
-            algorithm[1], param_grids[algorithm[0]], x_train, y_train, algorithm[0])
+            algorithm[1], param_grids[algorithm[0]], x_train, y_train, scoring, algorithm[0])
         search_output_filename = mm.generate_unique_filename(
             results_path, algorithm[0], 'GridSearch')
         search_cv_results.to_csv(search_output_filename, index=False)
@@ -190,17 +190,14 @@ except:
         print('\nInvalid parameters')
         quit()
 
-
-
-
 optimized_algorithm = algorithm[1].set_params(**params)
 print('\nPerforming supervised outlier removal')
-x_train_clean, y_train_clean, cv_score = mlm.supervised_outlier_removal(
+x_train_clean, y_train_clean, cv_results = mlm.supervised_outlier_removal(
     algorithm=optimized_algorithm, x_train=x_train, y_train= y_train,
     scoring=scoring, algorithm_name=algorithm[0])
-r2_cv = cv_score['test_r2'].mean()
-rmse_cv = cv_score['test_rmse'].mean()
-mae_cv = cv_score['test_mae'].mean()
+r2_cv = cv_results['test_r2'].mean()
+rmse_cv = cv_results['test_rmse'].mean()
+mae_cv = cv_results['test_mae'].mean()
 score_df_cv = pd.DataFrame(
     {'r2':r2_cv, 'rmse':rmse_cv, 'mae':mae_cv}, index=['score_cv'])
 
@@ -222,15 +219,23 @@ mae_clean = metrics.mean_absolute_error(y_test, y_pred_clean)
 score_df_clean = pd.DataFrame(
     {'r2':r2_clean, 'rmse':rmse_clean, 'mae':mae_clean}, index=['score_clean'])
 
-score_df_final = pd.concat([score_df, score_df_cv, score_df_clean], axis=0)
+cv_results_clean = model_selection.cross_validate(
+    estimator=model_clean, X=x_train_clean, y=y_train_clean, cv=10,
+    scoring=scoring, return_estimator=True, return_indices=True)
+r2_cv_clean = cv_results['test_r2'].mean()
+rmse_cv_clean = cv_results['test_rmse'].mean()
+mae_cv_clean = cv_results['test_mae'].mean()
+score_df_cv_clean = pd.DataFrame(
+    {'r2':r2_cv_clean, 'rmse':rmse_cv_clean, 'mae':mae_cv_clean}, index=['score_cv_clean'])
+
+score_df_final = pd.concat([score_df_cv, score_df, score_df_cv_clean, score_df_clean], axis=0)
 print(score_df_final)
 score_output_filename = mm.generate_unique_filename(
     results_path, algorithm[0], 'Scores')
-score_df_final.to_csv(score_output_filename, index=False)
+score_df_final.to_csv(score_output_filename)
 model_output_filename = mm.generate_unique_filename(
     results_path, algorithm[0], 'Model',suffix='.pkl')
 joblib.dump(model, model_output_filename)
 model_clean_output_filename = mm.generate_unique_filename(
     results_path, algorithm[0], 'ModelClean',suffix='.pkl')
 print(f'\nResults are available at {results_path}')
-

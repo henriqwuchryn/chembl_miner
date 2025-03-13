@@ -38,7 +38,8 @@ activity_df : pd.DataFrame = pd.DataFrame(activity_query)
 activity_df = activity_df[
     ['canonical_smiles', 'molecule_chembl_id', 'standard_type',
     'standard_value', 'standard_units']]
-activity_df = activity_df[activity_df['standard_value' > 0]]                        
+activity_df['standard_value'] = pd.to_numeric(activity_df['standard_value'], errors='coerce')
+activity_df = activity_df[activity_df['standard_value'] > 0]                        
 activity_df = activity_df.dropna().drop_duplicates("canonical_smiles").reset_index(drop=True)
 activity_df = mmm.getLipinskiDescriptors(activity_df)
 activity_df = mmm.getRo5Violations(activity_df)
