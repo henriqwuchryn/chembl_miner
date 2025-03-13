@@ -30,7 +30,7 @@ def supervised_outlier_removal(algorithm, x_train, y_train, scoring, algorithm_n
     return x_train_clean, y_train_clean, cv_results
 
 
-def evaluate_and_optimize(algorithm, params, x_train, y_train, algorithm_name):
+def evaluate_and_optimize(algorithm, params, x_train, y_train, scoring, algorithm_name):
     start_time = time.time()
     print(f"\nOptimizing {algorithm_name}")
     print(f"Parameters: {params}")
