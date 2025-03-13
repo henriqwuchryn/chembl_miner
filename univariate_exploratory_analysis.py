@@ -4,7 +4,7 @@ import seaborn as sns
 sns.set_theme(style='ticks')
 sns.set_theme(style='whitegrid',font='liberation serif')
 import matplotlib.pyplot as plt
-import molecules_manipulation_methods as mmm
+import miscelanneous_methods as mm
 import os
 import sys
 
@@ -109,12 +109,12 @@ plt.savefig(f'{results_path}/Ro5Violations_bioactivity.svg',bbox_inches='tight')
 activity_df_inactive = activity_df[activity_df['bioactivity_class'] == 'inactive']
 activity_df_active = activity_df[activity_df['bioactivity_class'] == 'active']
 mannwhitney_results = pd.concat([
-    mmm.mannwhitney_test('MW',activity_df_active,activity_df_inactive),
-    mmm.mannwhitney_test('LogP',activity_df_active,activity_df_inactive),
-    mmm.mannwhitney_test('NumHDonors',activity_df_active,activity_df_inactive),
-    mmm.mannwhitney_test('NumHAcceptors',activity_df_active,activity_df_inactive)
+    mm.mannwhitney_test('MW',activity_df_active,activity_df_inactive),
+    mm.mannwhitney_test('LogP',activity_df_active,activity_df_inactive),
+    mm.mannwhitney_test('NumHDonors',activity_df_active,activity_df_inactive),
+    mm.mannwhitney_test('NumHAcceptors',activity_df_active,activity_df_inactive)
 ])
 print(mannwhitney_results)
-print(f'\nPlots and Mann-Whitney U test results available at {results_path} folder\n')
+print(f'\nPlots and Mann-Whitney U test results are available at {results_path} folder\n')
 mannwhitney_results.to_csv(f'{results_path}/mannwhitney_results.csv', index=False)
 print('Evaluate results and adjust the plots if necessary.')

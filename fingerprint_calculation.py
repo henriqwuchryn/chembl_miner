@@ -1,8 +1,7 @@
 import pandas as pd
 import glob
 from padelpy import padeldescriptor, from_smiles
-from plyer import notification
-import molecules_manipulation_methods as mmm
+import miscelanneous_methods as mm
 import os
 import sys
 
@@ -16,6 +15,7 @@ except:
     quit()
 
 datasets_path = 'datasets'
+results_path = f'datasets/{filename[:-4]}'
 try:
     activity_df = pd.read_csv(f'{datasets_path}/{filename}')
 except:
@@ -24,6 +24,9 @@ except:
     else:
         print('\nInvalid file - cannot convert to dataframe')
     quit()
+
+if not os.path.exists(results_path):
+    os.makedirs(results_path)
 
 fingerprint_files = glob.glob('fingerprint/*.xml')
 fingerprint_files.sort()
@@ -43,7 +46,7 @@ except:
 reuse = 0
 if os.path.exists('descriptors.csv'):
     reuse = input('\nThere is a descriptors.csv file on the folder. Do you want to reutilize it? 1 or 0\n')
-    reuse = mmm.check_if_int(reuse)
+    reuse = mm.check_if_int(reuse)
 
 if reuse != 1:
     df_smi = activity_df['canonical_smiles']
@@ -67,7 +70,7 @@ else:
 descriptors_df = pd.read_csv('descriptors.csv')
 descriptors_df = descriptors_df.drop('Name',axis=1)
 select_variance = input('\nType 1 to remove descriptors with low variance\n')
-select_variance = mmm.check_if_int(select_variance)
+select_variance = mm.check_if_int(select_variance)
 
 if select_variance == 1:
     variance_threshold = input('\nType a value for Variance Treshold, between 0 and 1. Default is 0.1\n')
@@ -79,15 +82,13 @@ if select_variance == 1:
     except:
         print('\nNot a number. Using default value of 0.1')
         variance_threshold = 0.1
-    descriptors_df = mmm.remove_low_variance_columns(descriptors_df, variance_threshold)
-    output_filename = mmm.generate_unique_filename(datasets_path,
-                                                filename[:-6],
-                                                f'FP{fingerprint_index}',
-                                                f'VT{variance_threshold}')
+    descriptors_df = mm.remove_low_variance_columns(descriptors_df, variance_threshold)
+    output_filename = mm.generate_unique_filename(
+        results_path, filename[:-4],
+        f'FP{fingerprint_index}', f'VT{variance_threshold}')
 else:
-    output_filename = mmm.generate_unique_filename(datasets_path,
-                                                filename[:-6],
-                                                f'FP{fingerprint_index}')
+    output_filename = mm.generate_unique_filename(
+        results_path, filename[:-4], f'FP{fingerprint_index}')
 
 fingerprint_df = pd.concat([
     activity_df['molecule_chembl_id'],
@@ -99,7 +100,7 @@ print('\n',fingerprint_df)
 fingerprint_df.to_csv(output_filename, index=False)
 print(f'\nResult is avaliable at {output_filename}')
 clean = input('\nType 1 to delete temporary files\n')
-clean = mmm.check_if_int(clean)
+clean = mm.check_if_int(clean)
 
 if clean == 1:   
     os.remove('molecules.smi')

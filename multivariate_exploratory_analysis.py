@@ -1,4 +1,4 @@
-import molecules_manipulation_methods as mmm
+import miscelanneous_methods as mm
 import pandas as pd
 import numpy as np
 import seaborn as sns
@@ -38,7 +38,7 @@ features_df = fingerprint_df.drop(['molecule_chembl_id',
                                     axis=1)
 
 n_components = input('\nChoose how many principal components to compute\n')
-n_components = mmm.check_if_int(n_components,10)
+n_components = mm.check_if_int(n_components,10)
 principal_components_colnames = []
 
 for n in range(n_components):
@@ -74,7 +74,7 @@ plt.savefig(f'{results_path}/scree_plot-{n_components}_components.svg', bbox_inc
 print(f'\nScree plot saved at f{results_path}/scree_plot-{n_components}_components.svg')
 plot_pcs = input("""\nAre you ok with the amount of principal components?
 Press 1 to plot every combination possible\n""")
-plot_pcs = mmm.check_if_int(plot_pcs)
+plot_pcs = mm.check_if_int(plot_pcs)
 
 if plot_pcs == 1:
 
@@ -100,4 +100,4 @@ if plot_pcs == 1:
         for j in range (n_components):
             if i != j:
                 PcaGrapher(i+1,j+1,cryptococcus_pca)
-print('\nDone')
+print('\n PCA analysis are available at ',results_path)
