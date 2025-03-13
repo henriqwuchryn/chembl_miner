@@ -166,7 +166,7 @@ param_grids = {
 print(target_df.describe())
 
 
-def evaluate_and_optimize(algorithm, param_grid, X_train, y_train, X_test, y_test, algorithm_name):
+def evaluate_and_optimize(algorithm, param_grid, X_train, y_train,algorithm_name):
     print(f"\nOptimizing {algorithm_name}")
     print(f"Parameters: {param_grid}")
     grid_search = model_selection.GridSearchCV(estimator=model,
