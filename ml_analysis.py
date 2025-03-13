@@ -179,17 +179,16 @@ def evaluate_and_optimize(algorithm, param_grid, X_train, y_train,algorithm_name
     results = pd.DataFrame(grid_search.cv_results_)
     print(f'Results:\n{results}')
     print(f'\nBest parameters:\n{grid_search.best_params_}')
-    print(f'\nBest score indes:\n{grid_search.best_index_}')
+    print(f'\nBest score index:\n{grid_search.best_index_}')
     results.to_csv(f'{results_path}/{algorithm_name}_GridSearch.csv', index=False)
     return results
 
 
 if algorithm_index == 0 and confirmation == 1:
     for index, (name, algorithm) in algorithms.items():
-        results = evaluate_and_optimize(algorithm, param_grids[name], x_train, y_train, name)
+        evaluate_and_optimize(algorithm, param_grids[name], x_train, y_train, name)
 else:
     name, algorithm = algorithms[algorithm_index]
-    results = evaluate_and_optimize(algorithm, param_grids[name], x_train, y_train, name)
-    results_list.append(results)
+    evaluate_and_optimize(algorithm, param_grids[name], x_train, y_train, name)
 
 print(f"\nOptimization completed. Results saved to {results_path}.")
