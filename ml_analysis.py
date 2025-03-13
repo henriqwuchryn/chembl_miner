@@ -1,6 +1,8 @@
 import os
 import sys
-import time 
+import time
+import numpy as np
+import pandas as pd
 import miscelanneous_methods as mm
 import machine_learning_methods as mlm
 import joblib
@@ -37,31 +39,29 @@ if not os.path.exists(results_path):
 fingerprint_df.replace([np.inf, -np.inf], np.nan, inplace=True)
 fingerprint_df.dropna(inplace=True)
 fingerprint_df.reset_index(drop=True, inplace=True)
-features_df = fingerprint_df.drop(['molecule_chembl_id',
-                                    'neg_log_value',
-                                    'bioactivity_class'],
-                                    axis=1)
+features_df = fingerprint_df.drop(
+    ['molecule_chembl_id','neg_log_value','bioactivity_class'],axis=1)
 target_df = fingerprint_df['neg_log_value']
-x_train, x_test, y_train, y_test = model_selection.train_test_split(features_df,
-                                                    target_df,
-                                                    test_size=0.2,
-                                                    random_state=random_state)
+x_train, x_test, y_train, y_test = model_selection.train_test_split(
+    features_df, target_df, test_size=0.2, random_state=random_state)
 print(f'Number of features is: {features_df.shape[1]}')
 print(f'Number of samples is: {features_df.shape[0]}')
 print(f'size of train set is: {x_train.shape[0]}')
 print(f'size of test set is: {x_test.shape[0]}')
 #dict structure: index, (name, algorithm)
-algorithms: dict = {1:('BaggingRegressor',BaggingRegressor(random_state=random_state)),
-                    2:('GradientBoostingRegressor',GradientBoostingRegressor(random_state=random_state)),
-                    3:('LGBMRegressor',LGBMRegressor(random_state=random_state,verbosity=-1)),
-                    4:('RandomForestRegressor',RandomForestRegressor(random_state=random_state)),
-                    5:('XGBRegressor',XGBRegressor(random_state=random_state)),
-                    6:('HistGradientBoostingRegressor',HistGradientBoostingRegressor(random_state=random_state)),
-                    7:('ExtraTreesRegressor',ExtraTreesRegressor(random_state=random_state)),
-                    8:('AdaBoostRegressor',AdaBoostRegressor(random_state=random_state))
-                    }
+algorithms: dict = {
+    1:('BaggingRegressor',BaggingRegressor(random_state=random_state)),
+    2:('GradientBoostingRegressor',GradientBoostingRegressor(random_state=random_state)),
+    3:('LGBMRegressor',LGBMRegressor(random_state=random_state,verbosity=-1)),
+    4:('RandomForestRegressor',RandomForestRegressor(random_state=random_state)),
+    5:('XGBRegressor',XGBRegressor(random_state=random_state)),
+    6:('HistGradientBoostingRegressor',HistGradientBoostingRegressor(random_state=random_state)),
+    7:('ExtraTreesRegressor',ExtraTreesRegressor(random_state=random_state)),
+    8:('AdaBoostRegressor',AdaBoostRegressor(random_state=random_state))
+}
 print('\n',pd.DataFrame([(key, value[0]) for key, value in algorithms.items()],columns=['Index','Algorithm']),'\n')
-algorithm_index :str = input('Choose which algorithm to use by inserting the index. 0 for all.\n')
+algorithm_index :str = input(
+    'Choose which algorithm to use by inserting the index. 0 for all.\n')
 algorithm_index = mm.check_if_int(algorithm_index)
 
 if algorithm_index != 0:
@@ -82,7 +82,8 @@ else:
 
 scoring = {
     'r2': metrics.make_scorer(metrics.r2_score),
-    'rmse': metrics.make_scorer(lambda y_true, y_pred: metrics.root_mean_squared_error(y_true, y_pred)),
+    'rmse': metrics.make_scorer(
+        lambda y_true, y_pred: metrics.root_mean_squared_error(y_true, y_pred)),
     'mae': metrics.make_scorer(metrics.mean_absolute_error)
 }
 
@@ -195,15 +196,13 @@ except:
 optimized_algorithm = algorithm[1].set_params(**params)
 print('\nPerforming supervised outlier removal')
 x_train_clean, y_train_clean, cv_score = supervised_outlier_removal(
-    algorithm=optimized_algorithm,
-    x_train=x_train,
-    y_train= y_train,
-    scoring=scoring,
-    algorithm_name=algorithm[0])
+    algorithm=optimized_algorithm, x_train=x_train, y_train= y_train,
+    scoring=scoring, algorithm_name=algorithm[0])
 r2_cv = cv_score['test_r2'].mean()
 rmse_cv = cv_score['test_rmse'].mean()
 mae_cv = cv_score['test_mae'].mean()
-score_df_cv = pd.DataFrame({'r2':r2_cv, 'rmse':rmse_cv, 'mae':mae_cv}, index=['score_cv'])
+score_df_cv = pd.DataFrame(
+    {'r2':r2_cv, 'rmse':rmse_cv, 'mae':mae_cv}, index=['score_cv'])
 
 model = optimized_algorithm
 model.fit(x_train, y_train)
@@ -211,7 +210,8 @@ y_pred = model.predict(x_test)
 r2 = metrics.r2_score(y_test, y_pred)
 rmse = metrics.root_mean_squared_error(y_test, y_pred)
 mae = metrics.mean_absolute_error(y_test, y_pred)
-score_df = pd.DataFrame({'r2':r2, 'rmse':rmse, 'mae':mae}, index=['score'])
+score_df = pd.DataFrame(
+    {'r2':r2, 'rmse':rmse, 'mae':mae}, index=['score'])
 
 model_clean = optimized_algorithm
 model_clean.fit(x_train_clean, y_train_clean)
@@ -219,15 +219,18 @@ y_pred_clean = model_clean.predict(x_test)
 r2_clean = metrics.r2_score(y_test, y_pred_clean)
 rmse_clean = metrics.root_mean_squared_error(y_test, y_pred_clean)
 mae_clean = metrics.mean_absolute_error(y_test, y_pred_clean)
-score_df_clean = pd.DataFrame({'r2':r2_clean, 'rmse':rmse_clean, 'mae':mae_clean}, index=['score_clean'])
+score_df_clean = pd.DataFrame(
+    {'r2':r2_clean, 'rmse':rmse_clean, 'mae':mae_clean}, index=['score_clean'])
 
 score_df_final = pd.concat([score_df, score_df_cv, score_df_clean], axis=0)
 print(score_df_final)
-score_output_filename = mm.generate_unique_filename(results_path, algorithm[0], 'Scores')
+score_output_filename = mm.generate_unique_filename(
+    results_path, algorithm[0], 'Scores')
 score_df_final.to_csv(score_output_filename, index=False)
-print(f'\nScores saved to {score_output_filename}')
-model_output_filename = mm.generate_unique_filename(results_path, algorithm[0], 'Model',suffix='.pkl')
+model_output_filename = mm.generate_unique_filename(
+    results_path, algorithm[0], 'Model',suffix='.pkl')
 joblib.dump(model, model_output_filename)
-model_clean_output_filename = mm.generate_unique_filename(results_path, algorithm[0], 'ModelClean',suffix='.pkl')
-print(f'\nModels saved at {results_path}')
+model_clean_output_filename = mm.generate_unique_filename(
+    results_path, algorithm[0], 'ModelClean',suffix='.pkl')
+print(f'\nResults are available at {results_path}')
 

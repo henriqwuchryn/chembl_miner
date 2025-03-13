@@ -115,6 +115,6 @@ mannwhitney_results = pd.concat([
     mm.mannwhitney_test('NumHAcceptors',activity_df_active,activity_df_inactive)
 ])
 print(mannwhitney_results)
-print(f'\nPlots and Mann-Whitney U test results available at {results_path} folder\n')
+print(f'\nPlots and Mann-Whitney U test results are available at {results_path} folder\n')
 mannwhitney_results.to_csv(f'{results_path}/mannwhitney_results.csv', index=False)
 print('Evaluate results and adjust the plots if necessary.')

@@ -100,4 +100,4 @@ if plot_pcs == 1:
         for j in range (n_components):
             if i != j:
                 PcaGrapher(i+1,j+1,cryptococcus_pca)
-print('\nDone')
+print('\n PCA analysis are available at ',results_path)
