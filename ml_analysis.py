@@ -100,74 +100,74 @@ scoring = {
 }
 param_grids = {
     'BaggingRegressor': {
-        'n_estimators': [10, 50, 100, 200],
-        'max_samples': [0.5, 0.8, 1.0],
-        'max_features': [0.5, 0.8, 1.0],
+        'n_estimators': [10, 20, 40],#10
+        'max_samples': [0.7, 1.0],#1.0
+        'max_features': [0.7, 1.0],#1.0
         'bootstrap': [True, False],  # Whether samples are drawn with replacement
         'bootstrap_features': [True, False]  # Whether features are drawn with replacement
     },
     'GradientBoostingRegressor': {
-        'n_estimators': [50, 100, 200, 300],
-        'learning_rate': [0.01, 0.05, 0.1, 0.2],
-        'max_depth': [3, 5, 7, 9],
-        'min_samples_split': [2, 5, 10],
-        'min_samples_leaf': [1, 2, 4],
-        'subsample': [0.8, 0.9, 1.0],  # Fraction of samples used for fitting
-        'max_features': ['auto', 'sqrt', 'log2']  # Number of features to consider for splits
+        'n_estimators': [100, 200, 400], #100
+        'learning_rate': [0.05, 0.1, 0.2], #0.1
+        'max_depth': [3, 5, 7], #3
+        'min_samples_split': [2, 4], #2
+        'min_samples_leaf': [1, 2], #1
+        'subsample': [0.7, 1.0],  # 1.0
+        'max_features': [1.0, 'sqrt', 'log2']  # 1.0
     },
     'LGBMRegressor': {
-        'n_estimators': [50, 100, 200, 300],
-        'learning_rate': [0.01, 0.05, 0.1, 0.2],
-        'max_depth': [3, 5, 7, 9],
-        'num_leaves': [31, 50, 100],  # Maximum number of leaves in one tree
-        'min_child_samples': [20, 50, 100],  # Minimum number of data in one leaf
-        'subsample': [0.8, 0.9, 1.0],  # Fraction of samples used for fitting
-        'colsample_bytree': [0.8, 0.9, 1.0],  # Fraction of features used for fitting
-        'reg_alpha': [0, 0.1, 1],  # L1 regularization
-        'reg_lambda': [0, 0.1, 1]  # L2 regularization
+        'n_estimators': [100, 200, 400], #100
+        'learning_rate': [0.05, 0.1, 0.2],#0.1
+        'max_depth': [-1, 6, 9],#-1
+        'num_leaves': [31, 62],#62
+        'min_child_samples': [20, 40],#40
+        'subsample': [0.7, 1.0],  # Fraction of samples used for fitting
+        'colsample_bytree': [0.7, 1.0],  # Fraction of features used for fitting
+        'reg_alpha': [0, 0.1],  # L1 regularization
+        'reg_lambda': [0, 0.1]  # L2 regularization
     },
     'RandomForestRegressor': {
-        'n_estimators': [50, 100, 200, 300],
-        'max_depth': [3, 5, 7, 9, None],
-        'min_samples_split': [2, 5, 10],
-        'min_samples_leaf': [1, 2, 4],
-        'max_features': ['auto', 'sqrt', 'log2'],  # Number of features to consider for splits
+        'n_estimators': [100, 200, 400], #100
+        'max_depth': [6, 9, None], #None
+        'min_samples_split': [2, 4], #2
+        'min_samples_leaf': [1, 2], #1
+        'max_features': [1.0, 'sqrt', 'log2'],  # 1.0
         'bootstrap': [True, False],  # Whether bootstrap samples are used
         'oob_score': [True, False]  # Whether to use out-of-bag samples for estimation
     },
     'XGBRegressor': {
         'n_estimators': [50, 100, 200, 300],
-        'learning_rate': [0.01, 0.05, 0.1, 0.2],
-        'max_depth': [3, 5, 7, 9],
-        'min_child_weight': [1, 5, 10],  # Minimum sum of instance weight needed in a child
-        'gamma': [0, 0.1, 0.2],  # Minimum loss reduction required to make a split
-        'subsample': [0.8, 0.9, 1.0],  # Fraction of samples used for fitting
-        'colsample_bytree': [0.8, 0.9, 1.0],  # Fraction of features used for fitting
-        'reg_alpha': [0, 0.1, 1],  # L1 regularization
-        'reg_lambda': [0, 0.1, 1]  # L2 regularization
+        'learning_rate': [0.15, 0.3, 0.6],
+        'max_depth': [3, 6, 9],
+        'min_child_weight': [1, 2],  # Minimum sum of instance weight needed in a child
+        'gamma': [0, 0.1],  # Minimum loss reduction required to make a split
+        'subsample': [0.7, 1.0],  # Fraction of samples used for fitting
+        'colsample_bytree': [0.7, 1.0],  # Fraction of features used for fitting
+        'reg_alpha': [0, 0.1],  # L1 regularization
+        'reg_lambda': [0, 0.1]  # L2 regularization
     },
     'HistGradientBoostingRegressor': {
-        'max_iter': [50, 100, 200, 300],
-        'learning_rate': [0.01, 0.05, 0.1, 0.2],
-        'max_depth': [3, 5, 7, 9],
-        'min_samples_leaf': [1, 2, 4, 10],
-        'max_leaf_nodes': [31, 50, 100],  # Maximum number of leaves
-        'l2_regularization': [0, 0.1, 1],  # L2 regularization
-        'max_bins': [128, 256, 512]  # Maximum number of bins for feature discretization
+        'max_iter': [100, 200, 400], #100
+        'learning_rate': [0.05, 0.1, 0.2], #0.1
+        'max_depth': [6, 9, None], #None
+        'min_samples_leaf': [20, 40], #20
+        'max_leaf_nodes': [31, 62],  #61
+        'l2_regularization': [0, 0.1],  #0
+        'max_bins': [255, 610]  #255
     },
     'ExtraTreesRegressor': {
-        'n_estimators': [50, 100, 200, 300],
-        'max_depth': [3, 5, 7, 9, None],
-        'min_samples_split': [2, 5, 10],
-        'min_samples_leaf': [1, 2, 4],
-        'max_features': ['auto', 'sqrt', 'log2'],  # Number of features to consider for splits
+        'n_estimators': [100, 200, 300], #100
+        'max_depth': [6, 9, None], #None
+        'min_samples_split': [2, 4], #2
+        'min_samples_leaf': [1, 2], #1
+        'max_features': [1.0, 'sqrt', 'log2'],  # Number of features to consider for splits
         'bootstrap': [True, False],  # Whether bootstrap samples are used
         'oob_score': [True, False]  # Whether to use out-of-bag samples for estimation
     },
     'AdaBoostRegressor': {
-        'n_estimators': [50, 100, 200, 300],
-        'learning_rate': [0.01, 0.05, 0.1, 0.2],
-        'loss': ['linear', 'square', 'exponential']  # Loss function to optimize
+        'n_estimators': [50, 100, 200], #50
+        'learning_rate': [0.5, 1.0, 2.0], #1.0
+        'loss': ['linear', 'square', 'exponential']  #linear
     }
 }
 
