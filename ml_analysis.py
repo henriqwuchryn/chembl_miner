@@ -232,7 +232,7 @@ score_df_final = pd.concat([score_df_cv, score_df, score_df_cv_clean, score_df_c
 print(score_df_final)
 score_output_filename = mm.generate_unique_filename(
     results_path, algorithm[0], 'Scores')
-score_df_final.to_csv(score_output_filename, index=False)
+score_df_final.to_csv(score_output_filename)
 model_output_filename = mm.generate_unique_filename(
     results_path, algorithm[0], 'Model',suffix='.pkl')
 joblib.dump(model, model_output_filename)
