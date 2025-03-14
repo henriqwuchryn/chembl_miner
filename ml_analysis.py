@@ -220,7 +220,7 @@ score_df_clean = pd.DataFrame(
     {'r2':r2_clean, 'rmse':rmse_clean, 'mae':mae_clean}, index=['score_clean'])
 
 cv_results_clean = model_selection.cross_validate(
-    estimator=model_clean, X=x_train_clean, y=y_train_clean, cv=cv,
+    estimator=model_clean, X=x_train_clean, y=y_train_clean, cv=10,
     scoring=scoring, return_estimator=True, return_indices=True)
 r2_cv_clean = cv_results['test_r2'].mean()
 rmse_cv_clean = cv_results['test_rmse'].mean()
