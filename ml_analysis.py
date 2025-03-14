@@ -146,7 +146,7 @@ if optimize == 1:
             'min_samples_leaf': [20, 40], #20
             'max_leaf_nodes': [31, 62],  #61
             'l2_regularization': [0, 0.1],  #0
-            'max_bins': [255, 610]  #255
+            'max_bins': [125, 255]  #255
         },
         'ExtraTreesRegressor': {
             'n_estimators': [100, 200, 300], #100
@@ -169,13 +169,13 @@ if optimize == 1:
                 alg, param_grids[name], x_train, y_train, scoring, name)
             search_output_filename = mm.generate_unique_filename(
                 results_path, name, 'GridSearch')
-            search_cv_results.to_csv(search_output_filename, index=False)
+            search_cv_results.to_csv(search_output_filename)
     else:
         search_cv_results, best_params = mlm.evaluate_and_optimize(
             algorithm[1], param_grids[algorithm[0]], x_train, y_train, scoring, algorithm[0])
         search_output_filename = mm.generate_unique_filename(
             results_path, algorithm[0], 'GridSearch')
-        search_cv_results.to_csv(search_output_filename, index=False)
+        search_cv_results.to_csv(search_output_filename)
 
 
     print(f"\nOptimization completed. Results saved to {results_path}.")

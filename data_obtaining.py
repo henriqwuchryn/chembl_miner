@@ -59,8 +59,12 @@ for i in activity_df.standard_value:
         bioactivity_class.append("active")
     else:
         bioactivity_class.append("intermediate")
+
+#add neg_log_value descrive() from active class, to showcase range of predictibility
         
 activity_df['bioactivity_class'] = bioactivity_class
+print(activity_df['bioactivity_class'].value_counts())
+print(activity_df['neg_log_value'].describe())
 output_filename = mm.generate_unique_filename(datasets_path, target_chembl_id[6:], activity_type)
 activity_df.to_csv(output_filename, index=False)
 print(activity_df)
