@@ -78,7 +78,7 @@ else:
         print('\nAll algorithms will be used')
     else:
         print('\nIndex does not correspond to an algorithm')
-        quit()         
+        quit()
 
 scoring = {
     'r2': metrics.make_scorer(metrics.r2_score),

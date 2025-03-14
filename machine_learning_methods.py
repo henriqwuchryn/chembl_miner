@@ -34,8 +34,9 @@ def evaluate_and_optimize(algorithm, params, x_train, y_train, scoring, algorith
     start_time = time.time()
     print(f"\nOptimizing {algorithm_name}")
     print(f"Parameters: {params}")
-    grid_search = model_selection.GridSearchCV(estimator=algorithm, params=params,
-                                            scoring=scoring, refit='r2', n_jobs=-1)
+    grid_search = model_selection.GridSearchCV(
+        estimator=algorithm, param_grid=params,
+        scoring=scoring, refit='r2', n_jobs=-1)
     print('\nFitting\n')
     grid_search.fit(x_train, y_train)                                   
     search_cv_results = pd.DataFrame(grid_search.cv_results_)
