@@ -24,42 +24,61 @@ except:
 
 results_path = f'analysis/{filename[:-4]}'
 datasets_path = 'datasets'
+train_output_filename = filename[:-4]+'_train.csv'
+test_output_filename = filename[:-4]+'_test.csv'
 
-try:
-    fingerprint_df = pd.read_csv(f'{datasets_path}/{filename}')
-except:
-    if not os.path.exists(f'{datasets_path}/{filename}'):
-        print('File does not exist')
-    else:
-        print('Invalid file - cannot convert to dataframe')
-    quit()
-if not os.path.exists(results_path):
-    os.makedirs(results_path)
+if not os.path.exists(f'{datasets_path}/{train_output_filename}') or os.path.exists(f'{datasets_path}/{test_output_filename}'):
+    try:
+        fingerprint_df = pd.read_csv(f'{datasets_path}/{filename}')
+    except:
+        if not os.path.exists(f'{datasets_path}/{filename}'):
+            print('File does not exist')
+        else:
+            print('Invalid file - cannot convert to dataframe')
+        quit()
+    if not os.path.exists(results_path):
+        os.makedirs(results_path)
+    fingerprint_df.replace([np.inf, -np.inf], np.nan, inplace=True)
+    fingerprint_df.dropna(inplace=True)
+    fingerprint_df.reset_index(drop=True, inplace=True)
+    features_df = fingerprint_df.drop(
+        ['molecule_chembl_id','neg_log_value','bioactivity_class'],axis=1)
+    target_df = fingerprint_df['neg_log_value']
+    x_train, x_test, y_train, y_test = model_selection.train_test_split(
+        features_df, target_df, test_size=0.2, random_state=random_state)
+    train_df = pd.concat([x_train, y_train], axis=1)    
+    train_df.to_csv(f'{datasets_path}/{train_output_filename}', index=False)
+    test_df = pd.concat([x_test, y_test], axis=1)
+    test_df.to_csv(f'{datasets_path}/{test_output_filename}', index=False)
+    print(f'Number of samples is: {features_df.shape[0]}')
+else:
+    try:
+        train_df = pd.read_csv(f'{filename[:-4]}_train.csv')
+        x_train = train_df.drop('neg_log_value', axis=1)
+        y_train = train_df['neg_log_value']
+        test_df = pd.read_csv(f'{filename[:-4]}_test.csv')
+        x_test = test_df.drop('neg_log_value', axis=1)
+        y_test = test_df['neg_log_value']
+        print(f'Number of samples is: {x_train.shape[0]+x_test.shape[0]}')
+    except:
+        print('Invalid files')
+        quit()
 
-fingerprint_df.replace([np.inf, -np.inf], np.nan, inplace=True)
-fingerprint_df.dropna(inplace=True)
-fingerprint_df.reset_index(drop=True, inplace=True)
-features_df = fingerprint_df.drop(
-    ['molecule_chembl_id','neg_log_value','bioactivity_class'],axis=1)
-target_df = fingerprint_df['neg_log_value']
-x_train, x_test, y_train, y_test = model_selection.train_test_split(
-    features_df, target_df, test_size=0.2, random_state=random_state)
-print(f'Number of features is: {features_df.shape[1]}')
-print(f'Number of samples is: {features_df.shape[0]}')
+print(f'Number of features is: {x_train.shape[1]}')
 print(f'size of train set is: {x_train.shape[0]}')
 print(f'size of test set is: {x_test.shape[0]}')
 #dict structure: index, (name, algorithm)
 algorithms: dict = {
-    1:('BaggingRegressor',BaggingRegressor(random_state=random_state)),
-    2:('GradientBoostingRegressor',GradientBoostingRegressor(random_state=random_state)),
-    3:('LGBMRegressor',LGBMRegressor(random_state=random_state,verbosity=-1)),
-    4:('RandomForestRegressor',RandomForestRegressor(random_state=random_state)),
-    5:('XGBRegressor',XGBRegressor(random_state=random_state)),
-    6:('HistGradientBoostingRegressor',HistGradientBoostingRegressor(random_state=random_state)),
-    7:('ExtraTreesRegressor',ExtraTreesRegressor(random_state=random_state)),
-    8:('AdaBoostRegressor',AdaBoostRegressor(random_state=random_state))
+    1:('AdaBoostRegressor',AdaBoostRegressor(random_state=random_state)),
+    2:('BaggingRegressor',BaggingRegressor(random_state=random_state)),
+    3:('ExtraTreesRegressor',ExtraTreesRegressor(random_state=random_state)),
+    4:('GradientBoostingRegressor',GradientBoostingRegressor(random_state=random_state)),
+    5:('HistGradientBoostingRegressor',HistGradientBoostingRegressor(random_state=random_state)),
+    6:('LGBMRegressor',LGBMRegressor(random_state=random_state,verbosity=1, early_stopping_rounds=10)),
+    7:('RandomForestRegressor',RandomForestRegressor(random_state=random_state)),
+    8:('XGBRegressor',XGBRegressor(random_state=random_state)),
 }
-print('\n',pd.DataFrame([(key, value[0]) for key, value in algorithms.items()],columns=['Index','Algorithm']),'\n')
+print('\n',pd.DataFrame([(value[0]) for key, value in algorithms.items()],columns=['Algorithm'],index=algorithms.keys()),'\n')
 algorithm_index :str = input(
     'Choose which algorithm to use by inserting the index. 0 for all.\n')
 algorithm_index = mm.check_if_int(algorithm_index)
@@ -68,10 +87,13 @@ if algorithm_index != 0:
     try:
         algorithm = algorithms[algorithm_index]
         print('\nAlgorithm chosen:',algorithm[0])
+        optimize = input('\nDo you want to optimize the algorithms? 1 or 0\n')
+        optimize = mm.check_if_int(optimize)
     except:
         print('\nIndex does not correspond to an algorithm')
         quit()
 else:
+    optimize = 1 #if all algorithms were selected, there is only optimization
     confirmation = input('\nAre you sure you want to use all algorithms? Only available for optimization. 1 or 0\n')
     confirmation = mm.check_if_int(confirmation)
     if confirmation == 1:
@@ -80,15 +102,13 @@ else:
         print('\nIndex does not correspond to an algorithm')
         quit()
 
-scoring = {
+scoring = { #defining scoring metrics for optimization
     'r2': metrics.make_scorer(metrics.r2_score),
     'rmse': metrics.make_scorer(
         lambda y_true, y_pred: metrics.root_mean_squared_error(y_true, y_pred)),
     'mae': metrics.make_scorer(metrics.mean_absolute_error)
 }
 
-optimize = input('Do you want to optimize the algorithms? 1 or 0\n')
-optimize = mm.check_if_int(optimize)
 if optimize == 1:
     #dict structure: name, params
     param_grids = {
@@ -111,13 +131,13 @@ if optimize == 1:
         'LGBMRegressor': {
             'n_estimators': [100, 200, 400], #100
             'learning_rate': [0.05, 0.1, 0.2],#0.1
-            'max_depth': [-1, 6, 9],#-1
-            'num_leaves': [31, 62],#62
-            'min_child_samples': [20, 40],#40
+            'max_depth': [6, 9, 18],#-1
+            'num_leaves': [31, 62],#31
+            'min_child_samples': [20, 40],#20
             'subsample': [0.7, 1.0],  # Fraction of samples used for fitting
             'colsample_bytree': [0.7, 1.0],  # Fraction of features used for fitting
-            'reg_alpha': [0, 0.1],  # L1 regularization
-            'reg_lambda': [0, 0.1]  # L2 regularization
+            'reg_alpha': [0, 0.1, 1],  # L1 regularization
+            'reg_lambda': [0, 0.1, 1]  # L2 regularization
         },
         'RandomForestRegressor': {
             'n_estimators': [100, 200, 400], #100
@@ -136,8 +156,8 @@ if optimize == 1:
             'gamma': [0, 0.1],  # Minimum loss reduction required to make a split
             'subsample': [0.7, 1.0],  # Fraction of samples used for fitting
             'colsample_bytree': [0.7, 1.0],  # Fraction of features used for fitting
-            'reg_alpha': [0, 0.1],  # L1 regularization
-            'reg_lambda': [0, 0.1]  # L2 regularization
+            'reg_alpha': [0, 0.1, 1],  # L1 regularization
+            'reg_lambda': [0, 0.1, 1]  # L2 regularization
         },
         'HistGradientBoostingRegressor': {
             'max_iter': [100, 200, 400], #100
@@ -145,7 +165,7 @@ if optimize == 1:
             'max_depth': [6, 9, None], #None
             'min_samples_leaf': [20, 40], #20
             'max_leaf_nodes': [31, 62],  #61
-            'l2_regularization': [0, 0.1],  #0
+            'l2_regularization': [0, 0.1, 1],  #0
             'max_bins': [125, 255]  #255
         },
         'ExtraTreesRegressor': {
@@ -155,7 +175,7 @@ if optimize == 1:
             'min_samples_leaf': [1, 2], #1
             'max_features': [1.0, 'sqrt', 'log2'],  # Number of features to consider for splits
             'bootstrap': [True, False],  # Whether bootstrap samples are used
-            'oob_score': [True, False]  # Whether to use out-of-bag samples for estimation
+            # 'oob_score': [True, False]  # Whether to use out-of-bag samples for estimation
         },
         'AdaBoostRegressor': {
             'n_estimators': [50, 100, 200], #50
@@ -163,26 +183,35 @@ if optimize == 1:
             'loss': ['linear', 'square', 'exponential']  #linear
         }
     }
-    if algorithm_index == 0 and confirmation == 1:
+    if algorithm_index == 0:
         for index, (name, alg) in algorithms.items():
-            search_cv_results, best_params = mlm.evaluate_and_optimize(
+            search_cv_results, best_params, time_to_execute = mlm.evaluate_and_optimize(
                 alg, param_grids[name], x_train, y_train, scoring, name)
             search_output_filename = mm.generate_unique_filename(
-                results_path, name, 'GridSearch')
+                results_path, name, 'gridsearch')
             search_cv_results.to_csv(search_output_filename)
+            search_txtoutput_filename = mm.generate_unique_filename(
+                results_path, name, 'bestparams', 'time', suffix='.txt')
+            with open(search_txtoutput_filename, 'w') as file:
+                file.write(f'Evaluated parameters: {str(param_grids[name])}\nBest parameters: {str(best_params)}\nTime to run: {time_to_execute}\n') # writing parameters to text file
+        print(f"\nOptimization completed. Results saved to {search_output_filename}.")
+        quit() # following code only supports one algorithm at a time
+
     else:
-        search_cv_results, best_params = mlm.evaluate_and_optimize(
+        search_cv_results, best_params, time_to_execute = mlm.evaluate_and_optimize(
             algorithm[1], param_grids[algorithm[0]], x_train, y_train, scoring, algorithm[0])
         search_output_filename = mm.generate_unique_filename(
-            results_path, algorithm[0], 'GridSearch')
+            results_path, algorithm[0], 'gridsearch')
         search_cv_results.to_csv(search_output_filename)
-
-
-    print(f"\nOptimization completed. Results saved to {results_path}.")
+        search_txtoutput_filename = mm.generate_unique_filename(
+            results_path, algorithm[0], 'bestparams', 'time', suffix='.txt')
+        with open(search_txtoutput_filename, 'w') as file:
+            file.write(f'Evaluated parameters: {str(param_grids[algorithm[0]])}\nBest parameters: {str(best_params)}\nTime to run: {time_to_execute}\n') # writing parameters to text file
+        print(f"\nOptimization completed. Results saved to {search_output_filename}, {search_txtoutput_filename}.")
 
 try:
     params = best_params
-except:
+except: #if above fails, ask for input
     params = input(f'Insert the best parameters for the algorithm {algorithm[0]}\n')
     try:
         params = dict(eval(params))
@@ -192,6 +221,8 @@ except:
 
 optimized_algorithm = algorithm[1].set_params(**params)
 print('\nPerforming supervised outlier removal')
+
+
 x_train_clean, y_train_clean, cv_results = mlm.supervised_outlier_removal(
     algorithm=optimized_algorithm, x_train=x_train, y_train= y_train,
     scoring=scoring, algorithm_name=algorithm[0])
@@ -200,42 +231,39 @@ rmse_cv = cv_results['test_rmse'].mean()
 mae_cv = cv_results['test_mae'].mean()
 score_df_cv = pd.DataFrame(
     {'r2':r2_cv, 'rmse':rmse_cv, 'mae':mae_cv}, index=['score_cv'])
-
-model = optimized_algorithm
-model.fit(x_train, y_train)
-y_pred = model.predict(x_test)
-r2 = metrics.r2_score(y_test, y_pred)
-rmse = metrics.root_mean_squared_error(y_test, y_pred)
-mae = metrics.mean_absolute_error(y_test, y_pred)
-score_df = pd.DataFrame(
-    {'r2':r2, 'rmse':rmse, 'mae':mae}, index=['score'])
-
-model_clean = optimized_algorithm
-model_clean.fit(x_train_clean, y_train_clean)
-y_pred_clean = model_clean.predict(x_test)
-r2_clean = metrics.r2_score(y_test, y_pred_clean)
-rmse_clean = metrics.root_mean_squared_error(y_test, y_pred_clean)
-mae_clean = metrics.mean_absolute_error(y_test, y_pred_clean)
-score_df_clean = pd.DataFrame(
-    {'r2':r2_clean, 'rmse':rmse_clean, 'mae':mae_clean}, index=['score_clean'])
+r2_train = cv_results['train_r2'].mean()
+rmse_train = cv_results['train_rmse'].mean()
+mae_train = cv_results['train_mae'].mean()
+score_df_train = pd.DataFrame(
+    {'r2':r2_train, 'rmse':rmse_train, 'mae':mae_train}, index=['score_train'])
 
 cv_results_clean = model_selection.cross_validate(
-    estimator=model_clean, X=x_train_clean, y=y_train_clean, cv=10,
-    scoring=scoring, return_estimator=True, return_indices=True)
-r2_cv_clean = cv_results['test_r2'].mean()
-rmse_cv_clean = cv_results['test_rmse'].mean()
-mae_cv_clean = cv_results['test_mae'].mean()
+    estimator=optimized_algorithm, X=x_train_clean, y=y_train_clean, cv=10,
+    scoring=scoring, return_train_score=True)
+r2_cv_clean = cv_results_clean['test_r2'].mean()
+rmse_cv_clean = cv_results_clean['test_rmse'].mean()
+mae_cv_clean = cv_results_clean['test_mae'].mean()
 score_df_cv_clean = pd.DataFrame(
     {'r2':r2_cv_clean, 'rmse':rmse_cv_clean, 'mae':mae_cv_clean}, index=['score_cv_clean'])
+r2_train_clean = cv_results_clean['train_r2'].mean()
+rmse_train_clean = cv_results_clean['train_rmse'].mean()
+mae_train_clean = cv_results_clean['train_mae'].mean()
+score_df_train_clean = pd.DataFrame(
+    {'r2':r2_train_clean, 'rmse':rmse_train_clean, 'mae':mae_train_clean}, index=['score_train_clean'])
 
-score_df_final = pd.concat([score_df_cv, score_df, score_df_cv_clean, score_df_clean], axis=0)
+score_df_final = pd.concat([score_df_cv, score_df_train, score_df_cv_clean, score_df_train_clean], axis=0)
 print(score_df_final)
 score_output_filename = mm.generate_unique_filename(
-    results_path, algorithm[0], 'Scores')
+    results_path, algorithm[0], 'scores')
 score_df_final.to_csv(score_output_filename)
-model_output_filename = mm.generate_unique_filename(
-    results_path, algorithm[0], 'Model',suffix='.pkl')
-joblib.dump(model, model_output_filename)
-model_clean_output_filename = mm.generate_unique_filename(
-    results_path, algorithm[0], 'ModelClean',suffix='.pkl')
-print(f'\nResults are available at {results_path}')
+
+# trained models output removed, as it is not the point of this analysis
+
+# model_output_filename = mm.generate_unique_filename(
+#     results_path, algorithm[0], 'Model',suffix='.pkl')
+# joblib.dump(model, model_output_filename)
+# model_clean_output_filename = mm.generate_unique_filename(
+#     results_path, algorithm[0], 'ModelClean',suffix='.pkl')
+# joblib.dump(model_clean, model_clean_output_filename)
+
+print(f'\nResults are available at {score_output_filename}')

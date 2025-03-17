@@ -8,9 +8,8 @@ import os
 
 def supervised_outlier_removal(algorithm, x_train, y_train, scoring, algorithm_name, cv = 10):
     cv_results = model_selection.cross_validate(estimator=algorithm, X=x_train, y=y_train,
-                                                cv=cv, scoring=scoring, return_estimator=True,
-                                                return_indices=True)
-    residues = pd.Series()
+        cv=cv, scoring=scoring, return_estimator=True, return_indices=True, return_train_score=True)
+    residues = pd.Series().astype(float)
 
     for fold in range(cv):
         x_test_fold = x_train.iloc[cv_results['indices']['test'][fold]]
@@ -26,7 +25,7 @@ def supervised_outlier_removal(algorithm, x_train, y_train, scoring, algorithm_n
     y_train_clean = y_train[outlier_mask]
     print('Number of samples before cleaning:', x_train.shape[0])
     print('Number of samples after cleaning:', x_train_clean.shape[0])
-    print(f'\nRemoved {round(((x_train.shape[0]-x_train_clean.shape[0])/x_train.shape[0]*100),2)}% of samples')
+    print(f'Removed {round(((x_train.shape[0]-x_train_clean.shape[0])/x_train.shape[0]*100),2)}% of samples')
     return x_train_clean, y_train_clean, cv_results
 
 
@@ -50,4 +49,10 @@ def evaluate_and_optimize(algorithm, params, x_train, y_train, scoring, algorith
     # search_output_filename = mm.generate_unique_filename(results_path, algorithm_name, 'GridSearch')
     # search_cv_results.to_csv(search_output_filename, index=False)
    
-    return search_cv_results, best_params
+    return search_cv_results, best_params, time_to_execute
+
+def get_model_scores(y_pred, y_test):
+    r2 = metrics.r2_score(y_test, y_pred)
+    rmse = metrics.root_mean_squared_error(y_test, y_pred)
+    mae = metrics.mean_absolute_error(y_test, y_pred)
+    return r2, mse, mae

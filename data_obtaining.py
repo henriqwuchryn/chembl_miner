@@ -29,7 +29,7 @@ except:
     print('\nThe ID might be invalid. Please note that it is case-sensitive\nExiting')
     quit()
 
-activity_type :list[str] = input("\nChoose which type of result to obtain.\n")
+activity_type :str = input("\nChoose which type of result to obtain.\n")
 print('\nFiltering for type')
 activity_query = activity_query.filter(standard_type=activity_type)
 activity_df : pd.DataFrame = pd.DataFrame(activity_query)
@@ -65,7 +65,7 @@ for i in activity_df.standard_value:
 activity_df['bioactivity_class'] = bioactivity_class
 print(activity_df['bioactivity_class'].value_counts())
 print(activity_df['neg_log_value'].describe())
-output_filename = mm.generate_unique_filename(datasets_path, target_chembl_id[6:], activity_type)
+output_filename = mm.generate_unique_filename(datasets_path, target_chembl_id[6:], activity_type.lower())
 activity_df.to_csv(output_filename, index=False)
 print(activity_df)
 print(f'\nResult is avaliable at {output_filename}')
