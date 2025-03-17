@@ -8,8 +8,7 @@ import os
 
 def supervised_outlier_removal(algorithm, x_train, y_train, scoring, algorithm_name, cv = 10):
     cv_results = model_selection.cross_validate(estimator=algorithm, X=x_train, y=y_train,
-                                                cv=cv, scoring=scoring, return_estimator=True,
-                                                return_indices=True)
+        cv=cv, scoring=scoring, return_estimator=True, return_indices=True, return_train_score=True)
     residues = pd.Series()
 
     for fold in range(cv):
@@ -51,3 +50,9 @@ def evaluate_and_optimize(algorithm, params, x_train, y_train, scoring, algorith
     # search_cv_results.to_csv(search_output_filename, index=False)
    
     return search_cv_results, best_params
+
+def get_model_scores(y_pred = y_pred, y_test = y_test):
+    r2 = metrics.r2_score(y_test, y_pred)
+    rmse = metrics.root_mean_squared_error(y_test, y_pred)
+    mae = metrics.mean_absolute_error(y_test, y_pred)
+    return r2, mse, mae

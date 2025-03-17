@@ -200,33 +200,40 @@ rmse_cv = cv_results['test_rmse'].mean()
 mae_cv = cv_results['test_mae'].mean()
 score_df_cv = pd.DataFrame(
     {'r2':r2_cv, 'rmse':rmse_cv, 'mae':mae_cv}, index=['score_cv'])
+r2_train = cv_results['train_r2'].mean()
+rmse_train = cv_results['train_rmse'].mean()
+mae_train = cv_results['train_mae'].mean()
+score_df_train = pd.DataFrame(
+    {'r2':r2_train, 'rmse':rmse_train, 'mae':mae_train}, index=['score_train'])
 
 model = optimized_algorithm
 model.fit(x_train, y_train)
-y_pred = model.predict(x_test)
-r2 = metrics.r2_score(y_test, y_pred)
-rmse = metrics.root_mean_squared_error(y_test, y_pred)
-mae = metrics.mean_absolute_error(y_test, y_pred)
-score_df = pd.DataFrame(
-    {'r2':r2, 'rmse':rmse, 'mae':mae}, index=['score'])
+# y_pred = model.predict(x_test)
+# r2_test, rmse_test, mae_test = mlm.get_model_scores(y_pred, y_test)
+# score_df = pd.DataFrame(
+#     {'r2':r2_test, 'rmse':rmse_test, 'mae':mae_test}, index=['score_test'])
 
 model_clean = optimized_algorithm
 model_clean.fit(x_train_clean, y_train_clean)
-y_pred_clean = model_clean.predict(x_test)
-r2_clean = metrics.r2_score(y_test, y_pred_clean)
-rmse_clean = metrics.root_mean_squared_error(y_test, y_pred_clean)
-mae_clean = metrics.mean_absolute_error(y_test, y_pred_clean)
-score_df_clean = pd.DataFrame(
-    {'r2':r2_clean, 'rmse':rmse_clean, 'mae':mae_clean}, index=['score_clean'])
-
 cv_results_clean = model_selection.cross_validate(
     estimator=model_clean, X=x_train_clean, y=y_train_clean, cv=10,
-    scoring=scoring, return_estimator=True, return_indices=True)
+    scoring=scoring, return_train_score=True)
 r2_cv_clean = cv_results['test_r2'].mean()
 rmse_cv_clean = cv_results['test_rmse'].mean()
 mae_cv_clean = cv_results['test_mae'].mean()
 score_df_cv_clean = pd.DataFrame(
     {'r2':r2_cv_clean, 'rmse':rmse_cv_clean, 'mae':mae_cv_clean}, index=['score_cv_clean'])
+r2_train_clean = cv_results['train_r2'].mean()
+rmse_train_clean = cv_results['train_rmse'].mean()
+mae_train_clean = cv_results['train_mae'].mean()
+score_df_train_clean = pd.DataFrame(
+    {'r2':r2_train_clean, 'rmse':rmse_train_clean, 'mae':mae_train_clean}, index=['score_train_clean'])
+
+
+# y_pred_clean = model_clean.predict(x_test)
+# r2_test_clean, rmse_test_clean, mae_test_clean = mlm.get_model_scores(y_pred_clean, y_test)
+# score_df_clean = pd.DataFrame(
+#     {'r2':r2_test_clean, 'rmse':rmse_test_clean, 'mae':mae_test_clean}, index=['score_test_clean'])
 
 score_df_final = pd.concat([score_df_cv, score_df, score_df_cv_clean, score_df_clean], axis=0)
 print(score_df_final)
