@@ -51,7 +51,7 @@ def evaluate_and_optimize(algorithm, params, x_train, y_train, scoring, algorith
    
     return search_cv_results, best_params
 
-def get_model_scores(y_pred = y_pred, y_test = y_test):
+def get_model_scores(y_pred, y_test):
     r2 = metrics.r2_score(y_test, y_pred)
     rmse = metrics.root_mean_squared_error(y_test, y_pred)
     mae = metrics.mean_absolute_error(y_test, y_pred)

@@ -25,27 +25,46 @@ except:
 results_path = f'analysis/{filename[:-4]}'
 datasets_path = 'datasets'
 
-try:
-    fingerprint_df = pd.read_csv(f'{datasets_path}/{filename}')
-except:
-    if not os.path.exists(f'{datasets_path}/{filename}'):
-        print('File does not exist')
-    else:
-        print('Invalid file - cannot convert to dataframe')
-    quit()
-if not os.path.exists(results_path):
-    os.makedirs(results_path)
+if not os.path.exists(f'{filename[:-4]}_test.csv') or os.path.exists(f'{filename[:-4]}_train.csv'):
+    try:
+        fingerprint_df = pd.read_csv(f'{datasets_path}/{filename}')
+    except:
+        if not os.path.exists(f'{datasets_path}/{filename}'):
+            print('File does not exist')
+        else:
+            print('Invalid file - cannot convert to dataframe')
+        quit()
+    if not os.path.exists(results_path):
+        os.makedirs(results_path)
+    fingerprint_df.replace([np.inf, -np.inf], np.nan, inplace=True)
+    fingerprint_df.dropna(inplace=True)
+    fingerprint_df.reset_index(drop=True, inplace=True)
+    features_df = fingerprint_df.drop(
+        ['molecule_chembl_id','neg_log_value','bioactivity_class'],axis=1)
+    target_df = fingerprint_df['neg_log_value']
+    x_train, x_test, y_train, y_test = model_selection.train_test_split(
+        features_df, target_df, test_size=0.2, random_state=random_state)
+    train_df = pd.concat([x_train, y_train], axis=1)
+    train_output_filename = filename[:-4]+'_train.csv'
+    train_df.to_csv(train_output_filename, index=False)
+    test_df = pd.concat([x_test, y_test], axis=1)
+    test_output_filename = filename[:-4]+'_test.csv'
+    test_df.to_csv(test_output_filename, index=False)
+    print(f'Number of samples is: {features_df.shape[0]}')
+else:
+    try:
+        train_df = pd.read_csv(f'{filename[:-4]}_train.csv')
+        x_train = train_df.drop('neg_log_value', axis=1)
+        y_train = train_df['neg_log_value']
+        test_df = pd.read_csv(f'{filename[:-4]}_test.csv')
+        x_test = test_df.drop('neg_log_value', axis=1)
+        y_test = test_df['neg_log_value']
+        print(f'Number of samples is: {x_train.shape[0]+x_test.shape[0]}')
+    except:
+        print('Invalid files')
+        quit()
 
-fingerprint_df.replace([np.inf, -np.inf], np.nan, inplace=True)
-fingerprint_df.dropna(inplace=True)
-fingerprint_df.reset_index(drop=True, inplace=True)
-features_df = fingerprint_df.drop(
-    ['molecule_chembl_id','neg_log_value','bioactivity_class'],axis=1)
-target_df = fingerprint_df['neg_log_value']
-x_train, x_test, y_train, y_test = model_selection.train_test_split(
-    features_df, target_df, test_size=0.2, random_state=random_state)
-print(f'Number of features is: {features_df.shape[1]}')
-print(f'Number of samples is: {features_df.shape[0]}')
+print(f'Number of features is: {x_train.shape[1]}')
 print(f'size of train set is: {x_train.shape[0]}')
 print(f'size of test set is: {x_test.shape[0]}')
 #dict structure: index, (name, algorithm)
@@ -192,6 +211,7 @@ except:
 
 optimized_algorithm = algorithm[1].set_params(**params)
 print('\nPerforming supervised outlier removal')
+
 x_train_clean, y_train_clean, cv_results = mlm.supervised_outlier_removal(
     algorithm=optimized_algorithm, x_train=x_train, y_train= y_train,
     scoring=scoring, algorithm_name=algorithm[0])
@@ -206,17 +226,8 @@ mae_train = cv_results['train_mae'].mean()
 score_df_train = pd.DataFrame(
     {'r2':r2_train, 'rmse':rmse_train, 'mae':mae_train}, index=['score_train'])
 
-model = optimized_algorithm
-model.fit(x_train, y_train)
-# y_pred = model.predict(x_test)
-# r2_test, rmse_test, mae_test = mlm.get_model_scores(y_pred, y_test)
-# score_df = pd.DataFrame(
-#     {'r2':r2_test, 'rmse':rmse_test, 'mae':mae_test}, index=['score_test'])
-
-model_clean = optimized_algorithm
-model_clean.fit(x_train_clean, y_train_clean)
 cv_results_clean = model_selection.cross_validate(
-    estimator=model_clean, X=x_train_clean, y=y_train_clean, cv=10,
+    estimator=optimized_algorithm, X=x_train_clean, y=y_train_clean, cv=10,
     scoring=scoring, return_train_score=True)
 r2_cv_clean = cv_results['test_r2'].mean()
 rmse_cv_clean = cv_results['test_rmse'].mean()
@@ -228,12 +239,6 @@ rmse_train_clean = cv_results['train_rmse'].mean()
 mae_train_clean = cv_results['train_mae'].mean()
 score_df_train_clean = pd.DataFrame(
     {'r2':r2_train_clean, 'rmse':rmse_train_clean, 'mae':mae_train_clean}, index=['score_train_clean'])
-
-
-# y_pred_clean = model_clean.predict(x_test)
-# r2_test_clean, rmse_test_clean, mae_test_clean = mlm.get_model_scores(y_pred_clean, y_test)
-# score_df_clean = pd.DataFrame(
-#     {'r2':r2_test_clean, 'rmse':rmse_test_clean, 'mae':mae_test_clean}, index=['score_test_clean'])
 
 score_df_final = pd.concat([score_df_cv, score_df, score_df_cv_clean, score_df_clean], axis=0)
 print(score_df_final)
