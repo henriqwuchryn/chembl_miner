@@ -36,7 +36,7 @@ def evaluate_and_optimize(algorithm, params, x_train, y_train, scoring, algorith
     print(f"Parameters: {params}")
     grid_search = model_selection.GridSearchCV(
         estimator=algorithm, param_grid=params,
-        scoring=scoring, refit='r2', n_jobs=2)
+        scoring=scoring, refit='r2', n_jobs=-1)
     print('\nFitting\n')
     grid_search.fit(x_train, y_train)                                   
     search_cv_results = pd.DataFrame(grid_search.cv_results_)
