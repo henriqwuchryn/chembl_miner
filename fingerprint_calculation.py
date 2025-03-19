@@ -25,7 +25,8 @@ except:
     quit()
 
 if not os.path.exists(datasets_path):
-    os.makedirs(datasets_path)fingerprint_files = glob.glob('fingerprint/*.xml')
+    os.makedirs(datasets_path)
+fingerprint_files = glob.glob('fingerprint/*.xml')
 fingerprint_files.sort()
 fingerprint_files_df = pd.DataFrame(fingerprint_files)
 for row in fingerprint_files_df.index:
@@ -82,10 +83,10 @@ if select_variance == 1:
     descriptors_df = mm.remove_low_variance_columns(descriptors_df, variance_threshold)
     output_filename = mm.generate_unique_filename(
         datasets_path, filename[:-4],
-        f'FP{fingerprint_index}', f'VT{variance_threshold}')
+        f'fp{fingerprint_index}', f'vt{variance_threshold}')
 else:
     output_filename = mm.generate_unique_filename(
-        datasets_path, filename[:-4], f'FP{fingerprint_index}')
+        datasets_path, filename[:-4], f'fp{fingerprint_index}')
 
 fingerprint_df = pd.concat([
     activity_df['molecule_chembl_id'],

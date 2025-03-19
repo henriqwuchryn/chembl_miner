@@ -74,7 +74,7 @@ algorithms: dict = {
     3:('ExtraTreesRegressor',ExtraTreesRegressor(random_state=random_state)),
     4:('GradientBoostingRegressor',GradientBoostingRegressor(random_state=random_state)),
     5:('HistGradientBoostingRegressor',HistGradientBoostingRegressor(random_state=random_state)),
-    6:('LGBMRegressor',LGBMRegressor(random_state=random_state,verbosity=-1, early_stopping_rounds=10)),
+    6:('LGBMRegressor',LGBMRegressor(random_state=random_state,verbosity=1, early_stopping_rounds=10)),
     7:('RandomForestRegressor',RandomForestRegressor(random_state=random_state)),
     8:('XGBRegressor',XGBRegressor(random_state=random_state)),
 }
@@ -188,26 +188,26 @@ if optimize == 1:
             search_cv_results, best_params, time_to_execute = mlm.evaluate_and_optimize(
                 alg, param_grids[name], x_train, y_train, scoring, name)
             search_output_filename = mm.generate_unique_filename(
-                results_path, name, 'GridSearch')
+                results_path, name, 'gridsearch')
             search_cv_results.to_csv(search_output_filename)
             search_txtoutput_filename = mm.generate_unique_filename(
                 results_path, name, 'bestparams', 'time', suffix='.txt')
             with open(search_txtoutput_filename, 'w') as file:
                 file.write(f'Evaluated parameters: {str(param_grids[name])}\nBest parameters: {str(best_params)}\nTime to run: {time_to_execute}\n') # writing parameters to text file
-        print(f"\nOptimization completed. Results saved to {results_path}.")
+        print(f"\nOptimization completed. Results saved to {search_output_filename}.")
         quit() # following code only supports one algorithm at a time
 
     else:
         search_cv_results, best_params, time_to_execute = mlm.evaluate_and_optimize(
             algorithm[1], param_grids[algorithm[0]], x_train, y_train, scoring, algorithm[0])
         search_output_filename = mm.generate_unique_filename(
-            results_path, algorithm[0], 'GridSearch')
+            results_path, algorithm[0], 'gridsearch')
         search_cv_results.to_csv(search_output_filename)
         search_txtoutput_filename = mm.generate_unique_filename(
             results_path, algorithm[0], 'bestparams', 'time', suffix='.txt')
         with open(search_txtoutput_filename, 'w') as file:
             file.write(f'Evaluated parameters: {str(param_grids[algorithm[0]])}\nBest parameters: {str(best_params)}\nTime to run: {time_to_execute}\n') # writing parameters to text file
-        print(f"\nOptimization completed. Results saved to {results_path}.")
+        print(f"\nOptimization completed. Results saved to {search_output_filename}, {search_txtoutput_filename}.")
 
 try:
     params = best_params
@@ -221,6 +221,7 @@ except: #if above fails, ask for input
 
 optimized_algorithm = algorithm[1].set_params(**params)
 print('\nPerforming supervised outlier removal')
+
 
 x_train_clean, y_train_clean, cv_results = mlm.supervised_outlier_removal(
     algorithm=optimized_algorithm, x_train=x_train, y_train= y_train,
@@ -239,21 +240,21 @@ score_df_train = pd.DataFrame(
 cv_results_clean = model_selection.cross_validate(
     estimator=optimized_algorithm, X=x_train_clean, y=y_train_clean, cv=10,
     scoring=scoring, return_train_score=True)
-r2_cv_clean = cv_results['test_r2'].mean()
-rmse_cv_clean = cv_results['test_rmse'].mean()
-mae_cv_clean = cv_results['test_mae'].mean()
+r2_cv_clean = cv_results_clean['test_r2'].mean()
+rmse_cv_clean = cv_results_clean['test_rmse'].mean()
+mae_cv_clean = cv_results_clean['test_mae'].mean()
 score_df_cv_clean = pd.DataFrame(
     {'r2':r2_cv_clean, 'rmse':rmse_cv_clean, 'mae':mae_cv_clean}, index=['score_cv_clean'])
-r2_train_clean = cv_results['train_r2'].mean()
-rmse_train_clean = cv_results['train_rmse'].mean()
-mae_train_clean = cv_results['train_mae'].mean()
+r2_train_clean = cv_results_clean['train_r2'].mean()
+rmse_train_clean = cv_results_clean['train_rmse'].mean()
+mae_train_clean = cv_results_clean['train_mae'].mean()
 score_df_train_clean = pd.DataFrame(
     {'r2':r2_train_clean, 'rmse':rmse_train_clean, 'mae':mae_train_clean}, index=['score_train_clean'])
 
 score_df_final = pd.concat([score_df_cv, score_df_train, score_df_cv_clean, score_df_train_clean], axis=0)
 print(score_df_final)
 score_output_filename = mm.generate_unique_filename(
-    results_path, algorithm[0], 'Scores')
+    results_path, algorithm[0], 'scores')
 score_df_final.to_csv(score_output_filename)
 
 # trained models output removed, as it is not the point of this analysis
@@ -265,4 +266,4 @@ score_df_final.to_csv(score_output_filename)
 #     results_path, algorithm[0], 'ModelClean',suffix='.pkl')
 # joblib.dump(model_clean, model_clean_output_filename)
 
-print(f'\nResults are available at {results_path}')
+print(f'\nResults are available at {score_output_filename}')
