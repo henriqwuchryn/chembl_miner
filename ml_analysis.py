@@ -74,7 +74,7 @@ algorithms: dict = {
     3:('ExtraTreesRegressor',ExtraTreesRegressor(random_state=random_state)),
     4:('GradientBoostingRegressor',GradientBoostingRegressor(random_state=random_state)),
     5:('HistGradientBoostingRegressor',HistGradientBoostingRegressor(random_state=random_state)),
-    6:('LGBMRegressor',LGBMRegressor(random_state=random_state,verbosity=1, early_stopping_rounds=10)),
+    6:('LGBMRegressor',LGBMRegressor(random_state=random_state,verbosity=1)),
     7:('RandomForestRegressor',RandomForestRegressor(random_state=random_state)),
     8:('XGBRegressor',XGBRegressor(random_state=random_state)),
 }
@@ -137,7 +137,8 @@ if optimize == 1:
             'subsample': [0.7, 1.0],  # Fraction of samples used for fitting
             'colsample_bytree': [0.7, 1.0],  # Fraction of features used for fitting
             'reg_alpha': [0, 0.1, 1],  # L1 regularization
-            'reg_lambda': [0, 0.1, 1]  # L2 regularization
+            'reg_lambda': [0, 0.1, 1],  # L2 regularization
+            'force_row_wise': [True]
         },
         'RandomForestRegressor': {
             'n_estimators': [100, 200, 400], #100
