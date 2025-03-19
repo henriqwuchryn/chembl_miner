@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import re
 import numpy as np
 import pandas as pd
 import miscelanneous_methods as mm
@@ -26,6 +27,12 @@ results_path = f'analysis/{filename[:-4]}'
 datasets_path = 'datasets'
 train_output_filename = filename[:-4]+'_train.csv'
 test_output_filename = filename[:-4]+'_test.csv'
+# regex to get the pre-fingerprint filename
+match = re.match(
+    r'^(\d+)_([A-Z]+)_(\d+)_([A-Z0-9]+)_([A-Z]+[0-9.]+)_\d+\.csv$',
+    filename
+)
+activity_filename = f'{match.group(1)}_{match.group(2)}_{match.group(3)}.csv'
 
 if not os.path.exists(f'{datasets_path}/{train_output_filename}') or os.path.exists(f'{datasets_path}/{test_output_filename}'):
     try:
@@ -227,6 +234,19 @@ print('\nPerforming supervised outlier removal')
 x_train_clean, y_train_clean, cv_results = mlm.supervised_outlier_removal(
     algorithm=optimized_algorithm, x_train=x_train, y_train= y_train,
     scoring=scoring, algorithm_name=algorithm[0])
+print('Number of samples before cleaning:', x_train.shape[0])
+print('Number of samples after cleaning:', x_train_clean.shape[0])
+print(f'Removed {round(((x_train.shape[0]-x_train_clean.shape[0])/x_train.shape[0]*100),2)}% of samples')
+
+activity_df = pd.read_csv(f'{datasets_path}/{activity_filename}')
+outlier_df = activity_df[
+    np.logical_not(activity_df.index.isin(x_train_clean.index))
+    ]
+outlier_output_filename = mm.generate_unique_filename(
+    datasets_path, activity_filename[:-4], algorithm[1], 'outliers')
+outlier_df.to_csv(f'{datasets_path}/{activity_filename}_{algorithm[1]}_outliers.csv', index=True, index_label='index')
+print(f'\nOutliers are available at {outlier_output_filename}')
+
 r2_cv = cv_results['test_r2'].mean()
 rmse_cv = cv_results['test_rmse'].mean()
 mae_cv = cv_results['test_mae'].mean()
