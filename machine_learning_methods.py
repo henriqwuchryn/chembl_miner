@@ -23,9 +23,6 @@ def supervised_outlier_removal(algorithm, x_train, y_train, scoring, algorithm_n
     outlier_mask = np.abs(residues) <= limit
     x_train_clean = x_train[outlier_mask]
     y_train_clean = y_train[outlier_mask]
-    print('Number of samples before cleaning:', x_train.shape[0])
-    print('Number of samples after cleaning:', x_train_clean.shape[0])
-    print(f'Removed {round(((x_train.shape[0]-x_train_clean.shape[0])/x_train.shape[0]*100),2)}% of samples')
     return x_train_clean, y_train_clean, cv_results
 
 
@@ -34,8 +31,7 @@ def evaluate_and_optimize(algorithm, params, x_train, y_train, scoring, algorith
     print(f"\nOptimizing {algorithm_name}")
     print(f"Parameters: {params}")
     grid_search = model_selection.GridSearchCV(
-        estimator=algorithm, param_grid=params,
-        scoring=scoring, refit='r2', n_jobs=-1)
+        estimator=algorithm, param_grid=params, scoring=scoring, refit='r2', n_jobs=-1, return_train_score=True)
     print('\nFitting\n')
     grid_search.fit(x_train, y_train)                                   
     search_cv_results = pd.DataFrame(grid_search.cv_results_)

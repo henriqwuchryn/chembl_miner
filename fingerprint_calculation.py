@@ -58,7 +58,7 @@ You can check the progression at the descriptors.csv.log file that was created o
                     detectaromaticity=True,
                     standardizenitro=True,
                     standardizetautomers=True,
-                    threads=2,
+                    threads=8,
                     removesalt=True,
                     log=True,
                     fingerprints=True)
@@ -97,7 +97,7 @@ fingerprint_df = pd.concat([
 print('\n',fingerprint_df)
 fingerprint_df.to_csv(output_filename, index=False)
 print(f'\nResult is avaliable at {output_filename}')
-clean = input('\nType 1 to delete temporary files\n')
+clean = input('\nType 1 to delete temporary files\nYou can keep them to reutilize descriptors.csv\n')
 clean = mm.check_if_int(clean)
 
 if clean == 1:   

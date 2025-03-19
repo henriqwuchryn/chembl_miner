@@ -12,6 +12,7 @@ if not os.path.exists(datasets_path):
     os.mkdir(datasets_path)
 
 target_chembl_id :str = input("\nInsert ChEMBL Target ID: \n")
+activity_type :list[str] = input("\nChoose which type of result to obtain.\n")
 will_convert = input(
     """\nDo you want to convert to mol/L? 1 or 0.
 Note that only nM, uM, mM and ug/mL are supported and
@@ -29,7 +30,6 @@ except:
     print('\nThe ID might be invalid. Please note that it is case-sensitive\nExiting')
     quit()
 
-activity_type :str = input("\nChoose which type of result to obtain.\n")
 print('\nFiltering for type')
 activity_query = activity_query.filter(standard_type=activity_type)
 activity_df : pd.DataFrame = pd.DataFrame(activity_query)
