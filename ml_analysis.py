@@ -8,6 +8,7 @@ import miscelanneous_methods as mm
 import machine_learning_methods as mlm
 import joblib
 from sklearn.ensemble import *
+import sklearn.preprocessing as preproc
 from xgboost import XGBRegressor
 from lightgbm import LGBMRegressor
 import sklearn.metrics as metrics
@@ -29,7 +30,7 @@ train_output_filename = filename[:-4]+'_train.csv'
 test_output_filename = filename[:-4]+'_test.csv'
 # regex to get the pre-fingerprint filename
 match = re.match(
-    r'^(\d+)_([A-Z]+)_(\d+)_([A-Z0-9]+)_([A-Z]+[0-9.]+)_\d+\.csv$',
+    r'^(\d+)_([a-z]+)_(\d+)_([a-z0-9]+)_([a-z]+[0-9.]+)_\d+\.csv$',
     filename
 )
 activity_filename = f'{match.group(1)}_{match.group(2)}_{match.group(3)}.csv'
@@ -43,8 +44,6 @@ if not os.path.exists(f'{datasets_path}/{train_output_filename}') or os.path.exi
         else:
             print('Invalid file - cannot convert to dataframe')
         quit()
-    if not os.path.exists(results_path):
-        os.makedirs(results_path)
     fingerprint_df.replace([np.inf, -np.inf], np.nan, inplace=True)
     fingerprint_df.dropna(inplace=True)
     fingerprint_df.reset_index(drop=True, inplace=True)
@@ -74,6 +73,17 @@ else:
 print(f'Number of features is: {x_train.shape[1]}')
 print(f'size of train set is: {x_train.shape[0]}')
 print(f'size of test set is: {x_test.shape[0]}')
+print(f'\n{x_train.head()}')
+use_scaler = input('\nDo you want to use a scaler? 1 or 0\n')
+use_scaler = mm.check_if_int(use_scaler)
+if use_scaler == 1:
+    x_train = mlm.scale_features(x_train, preproc.StandardScaler())
+    x_test = mlm.scale_features(x_test, preproc.StandardScaler())
+    print(f'\nFeatures scaled\n{x_train.head()}')
+    results_path = f'analysis/{filename[:-4]}/scaled'
+if not os.path.exists(results_path):
+    os.makedirs(results_path)
+
 #dict structure: index, (name, algorithm)
 algorithms: dict = {
     1:('AdaBoostRegressor',AdaBoostRegressor(random_state=random_state)),
@@ -230,7 +240,6 @@ except: #if above fails, ask for input
 optimized_algorithm = algorithm[1].set_params(**params)
 print('\nPerforming supervised outlier removal')
 
-
 x_train_clean, y_train_clean, cv_results = mlm.supervised_outlier_removal(
     algorithm=optimized_algorithm, x_train=x_train, y_train= y_train,
     scoring=scoring, algorithm_name=algorithm[0])
@@ -243,8 +252,8 @@ outlier_df = activity_df[
     np.logical_not(activity_df.index.isin(x_train_clean.index))
     ]
 outlier_output_filename = mm.generate_unique_filename(
-    datasets_path, activity_filename[:-4], algorithm[1], 'outliers')
-outlier_df.to_csv(f'{datasets_path}/{activity_filename}_{algorithm[1]}_outliers.csv', index=True, index_label='index')
+    datasets_path, activity_filename[:-4], algorithm[0], 'outliers')
+outlier_df.to_csv(f'{datasets_path}/{activity_filename}_{algorithm[0][0:8]}_outliers.csv', index=True, index_label='index')
 print(f'\nOutliers are available at {outlier_output_filename}')
 
 r2_cv = cv_results['test_r2'].mean()
