@@ -72,7 +72,7 @@ plt.legend()
 plt.savefig(f'{results_path}/NumHAcceptors_density.svg')
 
 plt.figure(figsize=(8, 8))
-sns.jointplot(x='MW', y='LogP', data=activity_df, hue = 'bioactivity_class',
+sns.jointplot(data=activity_df, x='MW', y='LogP', hue = 'bioactivity_class',
     hue_order=['active','inactive'], edgecolor='black', alpha=0.5, marginal_kws={'bw_adjust':0.5})
 plt.ylim(-10,15)
 plt.xlim(0,2000)
