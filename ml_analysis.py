@@ -74,6 +74,14 @@ else:
 print(f'Number of features is: {x_train.shape[1]}')
 print(f'size of train set is: {x_train.shape[0]}')
 print(f'size of test set is: {x_test.shape[0]}')
+print(f'\n{x_train.head()}')
+use_scaler = input('\nDo you want to use a scaler? 1 or 0\n')
+use_scaler = mm.check_if_int(use_scaler)
+if use_scaler == 1:
+    x_train = mlm.scale_features(x_train)
+    x_test = mlm.scale_features(x_test)
+    print(f'\nFeatures scaled\n{x_train.head()}')
+
 #dict structure: index, (name, algorithm)
 algorithms: dict = {
     1:('AdaBoostRegressor',AdaBoostRegressor(random_state=random_state)),
@@ -230,7 +238,6 @@ except: #if above fails, ask for input
 optimized_algorithm = algorithm[1].set_params(**params)
 print('\nPerforming supervised outlier removal')
 
-
 x_train_clean, y_train_clean, cv_results = mlm.supervised_outlier_removal(
     algorithm=optimized_algorithm, x_train=x_train, y_train= y_train,
     scoring=scoring, algorithm_name=algorithm[0])
@@ -244,7 +251,7 @@ outlier_df = activity_df[
     ]
 outlier_output_filename = mm.generate_unique_filename(
     datasets_path, activity_filename[:-4], algorithm[1], 'outliers')
-outlier_df.to_csv(f'{datasets_path}/{activity_filename}_{algorithm[1]}_outliers.csv', index=True, index_label='index')
+outlier_df.to_csv(f'{datasets_path}/{activity_filename}_{algorithm[1][0:8]}_outliers.csv', index=True, index_label='index')
 print(f'\nOutliers are available at {outlier_output_filename}')
 
 r2_cv = cv_results['test_r2'].mean()

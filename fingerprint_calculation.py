@@ -58,12 +58,15 @@ You can check the progression at the descriptors.csv.log file that was created o
                     detectaromaticity=True,
                     standardizenitro=True,
                     standardizetautomers=True,
-                    threads=8,
+                    threads=-1,
                     removesalt=True,
                     log=True,
                     fingerprints=True)
 else:
     print('\nReutilizing descriptors.csv file')
+    fingerprint = open('fingerprint_used','r').read()
+    fingerprint_index = fingerprint_files.index(fingerprint)
+    os.remove('fingerprint_used')
 
 descriptors_df = pd.read_csv('descriptors.csv')
 descriptors_df = descriptors_df.drop('Name',axis=1)
@@ -104,5 +107,9 @@ if clean == 1:
     os.remove('molecules.smi')
     os.remove('descriptors.csv')
     os.remove('descriptors.csv.log')
-
+else:
+    with open('fingerprint_used','w') as f:
+        f.write(fingerprint)
+        f.close()
+    print('\nTemporary files kept for reutilization')
 

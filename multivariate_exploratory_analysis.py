@@ -5,6 +5,8 @@ import seaborn as sns
 sns.set_theme(style='ticks')
 sns.set_theme(style='whitegrid',font='liberation serif')
 from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+import machine_learning_methods as mlm
 import matplotlib.pyplot as plt
 import os
 import sys
@@ -29,8 +31,6 @@ except:
     else:
         print('Invalid file - cannot convert to dataframe')
     quit()
-if not os.path.exists(results_path):
-    os.makedirs(results_path)
 
 fingerprint_df = fingerprint_df.drop(
     fingerprint_df[fingerprint_df['bioactivity_class'] == 'intermediate'].index)
@@ -46,6 +46,15 @@ principal_components_colnames = []
 for n in range(n_components):
     col_name = 'PC '+str(n+1)
     principal_components_colnames.append(col_name)
+
+
+use_scaler = input('\nDo you want to use a scaler on the features data? 1 or 0\n')
+use_scaler = mm.check_if_int(use_scaler)
+if use_scaler == 1:
+    features_df = mlm.scale_features(features_df, StandardScaler())
+    results_path = f'{results_path}/scaled'
+if not os.path.exists(results_path):
+        os.makedirs(results_path)
 
 pca = PCA(n_components=n_components)
 principal_components = pca.fit_transform(features_df)
@@ -98,4 +107,4 @@ if plot_pcs == 1:
         for j in range (n_components):
             if i != j:
                 PcaGrapher(i+1,j+1,pca_df_classes, expl_var)
-    print(f'\n PCA analysis are available at {results_path}')
+    print(f'\nPCA analysis are available at {results_path}')

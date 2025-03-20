@@ -52,3 +52,7 @@ def get_model_scores(y_pred, y_test):
     rmse = metrics.root_mean_squared_error(y_test, y_pred)
     mae = metrics.mean_absolute_error(y_test, y_pred)
     return r2, mse, mae
+
+def scale_features(features, scaler):
+    features_scaled = scaler.fit_transform(features)
+    return features_scaled
