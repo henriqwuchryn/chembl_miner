@@ -55,5 +55,5 @@ def get_model_scores(y_pred, y_test):
 
 def scale_features(features, scaler):
     features_scaled = scaler.fit_transform(features)
-    features_scaled = pd.DataFrame(features_scaled)
+    features_scaled = pd.DataFrame(features_scaled, index=features.index)
     return features_scaled
