@@ -1,7 +1,9 @@
 import pandas as pd
 import glob
-from padelpy import padeldescriptor, from_smiles
 import miscelanneous_methods as mm
+import molecules_manipulation_methods as mmm
+import machine_learning_methods as mlm
+import sklearn. preprocessing as preproc
 import os
 import sys
 
@@ -16,7 +18,7 @@ except:
 
 datasets_path = 'datasets'
 try:
-    activity_df = pd.read_csv(f'{datasets_path}/{filename}')
+    activity_df = pd.read_csv(f'{datasets_path}/{filename}', index_col='index')
 except:
     if not os.path.exists(f'{datasets_path}/{filename}'):
         print('\nFile does not exist')
@@ -32,11 +34,11 @@ fingerprint_files_df = pd.DataFrame(fingerprint_files)
 for row in fingerprint_files_df.index:
     fingerprint_files_df.at[row,0] = fingerprint_files_df.at[row,0][12:-4]
 print(fingerprint_files_df)
-fingerprint_index:str = input('\nSelect which fingerprint method you want to use by inserting the index\n')
+fingerprint_index:str = input('\nSelect which fingerprint method you want to use by inserting the index\nNegative index will use all fingerprints\n')
 try:
     fingerprint_index = int(fingerprint_index)
-    fingerprint = fingerprint_files[fingerprint_index]
-    print(fingerprint)
+    if fingerprint_index >= 0:
+        fingerprint = fingerprint_files[fingerprint_index]
 except:
     print('\nPlease type only the index number of the fingerprint method you want')
     quit()
@@ -47,29 +49,29 @@ if os.path.exists('descriptors.csv'):
     reuse = mm.check_if_int(reuse)
 
 if reuse != 1:
-    df_smi = activity_df['canonical_smiles']
-    df_smi.to_csv('molecules.smi', sep='\t',  index=False, header=False)
-    print('''\nBeginning descriptor calculation. This will create a descriptors.csv file.
-It can take a couple of hours or more, depending on your dataset size and descriptors chosen.
-You can check the progression at the descriptors.csv.log file that was created on this folder''')
-    padeldescriptor(mol_dir='molecules.smi',
-                    d_file='descriptors.csv',
-                    descriptortypes=fingerprint,
-                    detectaromaticity=True,
-                    standardizenitro=True,
-                    standardizetautomers=True,
-                    threads=-1,
-                    removesalt=True,
-                    log=True,
-                    fingerprints=True)
+    if fingerprint_index >= 0:
+            mmm.calculate_fingerprint(activity_df, fingerprint)
+    if fingerprint_index < 0:
+        descriptors_df = pd.DataFrame(index=activity_df.index)
+        for i in fingerprint_files:
+            mmm.calculate_fingerprint(activity_df, i)
+            descriptors_df_i = pd.read_csv('descriptors.csv')
+            descriptors_df_i = descriptors_df_i.drop('Name',axis=1)
+            descriptors_df_i = pd.DataFrame(descriptors_df_i,index=activity_df.index)
+            descriptors_df = pd.concat([descriptors_df, descriptors_df_i], axis=1)
+            os.remove('descriptors.csv')
+            os.remove('descriptors.csv.log')
+        descriptors_df.to_csv('descriptors.csv')
 else:
     print('\nReutilizing descriptors.csv file')
-    fingerprint = open('fingerprint_used','r').read()
-    fingerprint_index = fingerprint_files.index(fingerprint)
-    os.remove('fingerprint_used')
+    fingerprint_index = int(open('fingerprint_used','r').read())
 
 descriptors_df = pd.read_csv('descriptors.csv')
-descriptors_df = descriptors_df.drop('Name',axis=1)
+if fingerprint_index >= 0:
+    descriptors_df = descriptors_df.drop('Name',axis=1)
+descriptors_df = pd.DataFrame(descriptors_df,index=activity_df.index)
+descriptors_df = mlm.scale_features(descriptors_df, preproc.MinMaxScaler())
+
 select_variance = input('\nType 1 to remove descriptors with low variance\n')
 select_variance = mm.check_if_int(select_variance)
 
@@ -93,12 +95,12 @@ else:
 
 fingerprint_df = pd.concat([
     activity_df['molecule_chembl_id'],
-    descriptors_df,
     activity_df['neg_log_value'],
-    activity_df['bioactivity_class']],
+    activity_df['bioactivity_class'],
+    descriptors_df],
     axis = 1)
 print('\n',fingerprint_df)
-fingerprint_df.to_csv(output_filename, index=False)
+fingerprint_df.to_csv(output_filename, index=True, index_label='index')
 print(f'\nResult is avaliable at {output_filename}')
 clean = input('\nType 1 to delete temporary files\nYou can keep them to reutilize descriptors.csv\n')
 clean = mm.check_if_int(clean)
@@ -107,9 +109,10 @@ if clean == 1:
     os.remove('molecules.smi')
     os.remove('descriptors.csv')
     os.remove('descriptors.csv.log')
+    os.remove('fingerprint_used')
 else:
     with open('fingerprint_used','w') as f:
-        f.write(fingerprint)
+        f.write(str(fingerprint_index))
         f.close()
     print('\nTemporary files kept for reutilization')
 

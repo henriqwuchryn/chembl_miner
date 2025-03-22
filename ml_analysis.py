@@ -26,18 +26,21 @@ except:
 
 results_path = f'analysis/{filename[:-4]}'
 datasets_path = 'datasets'
-train_output_filename = filename[:-4]+'_train.csv'
-test_output_filename = filename[:-4]+'_test.csv'
+train_output_filename = f'{datasets_path}/{filename[:-4]}_train.csv'
+test_output_filename = f'{datasets_path}/{filename[:-4]}_test.csv'
 # regex to get the pre-fingerprint filename
 match = re.match(
-    r'^(\d+)_([a-z]+)_(\d+)_([a-z0-9]+)_([a-z]+[0-9.]+)_\d+\.csv$',
+    r'^(\d+)_([a-z]+)_(\d+)_([a-z]+\-*[.0-9]+)_([a-z]+[0-9.]+)_\d+\.csv$',
     filename
 )
+if match == None:
+    print('Invalid filename')
+    quit()
 activity_filename = f'{match.group(1)}_{match.group(2)}_{match.group(3)}.csv'
 
-if not os.path.exists(f'{datasets_path}/{train_output_filename}') or os.path.exists(f'{datasets_path}/{test_output_filename}'):
+if not (os.path.exists(train_output_filename) and os.path.exists(test_output_filename)):
     try:
-        fingerprint_df = pd.read_csv(f'{datasets_path}/{filename}')
+        fingerprint_df = pd.read_csv(f'{datasets_path}/{filename}', index_col='index')
     except:
         if not os.path.exists(f'{datasets_path}/{filename}'):
             print('File does not exist')
@@ -46,28 +49,31 @@ if not os.path.exists(f'{datasets_path}/{train_output_filename}') or os.path.exi
         quit()
     fingerprint_df.replace([np.inf, -np.inf], np.nan, inplace=True)
     fingerprint_df.dropna(inplace=True)
-    fingerprint_df.reset_index(drop=True, inplace=True)
     features_df = fingerprint_df.drop(
         ['molecule_chembl_id','neg_log_value','bioactivity_class'],axis=1)
     target_df = fingerprint_df['neg_log_value']
+    print('splitting')
+    print(fingerprint_df)
     x_train, x_test, y_train, y_test = model_selection.train_test_split(
         features_df, target_df, test_size=0.2, random_state=random_state)
-    train_df = pd.concat([x_train, y_train], axis=1)    
-    train_df.to_csv(f'{datasets_path}/{train_output_filename}', index=False)
+    train_df = pd.concat([x_train, y_train], axis=1)
+    train_df.to_csv(train_output_filename, index=True, index_label='index')
     test_df = pd.concat([x_test, y_test], axis=1)
-    test_df.to_csv(f'{datasets_path}/{test_output_filename}', index=False)
+    test_df.to_csv(test_output_filename, index=True, index_label='index')
     print(f'Number of samples is: {features_df.shape[0]}')
 else:
     try:
-        train_df = pd.read_csv(f'{filename[:-4]}_train.csv')
+        print('reusing split')
+        train_df = pd.read_csv(train_output_filename, index_col='index')
         x_train = train_df.drop('neg_log_value', axis=1)
         y_train = train_df['neg_log_value']
-        test_df = pd.read_csv(f'{filename[:-4]}_test.csv')
+        test_df = pd.read_csv(test_output_filename, index_col='index')
         x_test = test_df.drop('neg_log_value', axis=1)
         y_test = test_df['neg_log_value']
         print(f'Number of samples is: {x_train.shape[0]+x_test.shape[0]}')
-    except:
+    except Exception as e:
         print('Invalid files')
+        print(e)
         quit()
 
 print(f'Number of features is: {x_train.shape[1]}')
@@ -247,13 +253,13 @@ print('Number of samples before cleaning:', x_train.shape[0])
 print('Number of samples after cleaning:', x_train_clean.shape[0])
 print(f'Removed {round(((x_train.shape[0]-x_train_clean.shape[0])/x_train.shape[0]*100),2)}% of samples')
 
-activity_df = pd.read_csv(f'{datasets_path}/{activity_filename}')
-outlier_df = activity_df[
-    np.logical_not(activity_df.index.isin(x_train_clean.index))
-    ]
+activity_df = pd.read_csv(f'{datasets_path}/{activity_filename}', index_col='index')
+full_df = pd.concat([activity_df,x_train], axis=1)
+outlier_mask = np.logical_not(full_df.index.isin(x_train_clean.index))
+outlier_df = full_df[outlier_mask]
 outlier_output_filename = mm.generate_unique_filename(
-    datasets_path, activity_filename[:-4], algorithm[0], 'outliers')
-outlier_df.to_csv(f'{datasets_path}/{activity_filename}_{algorithm[0][0:8]}_outliers.csv', index=True, index_label='index')
+    datasets_path, filename[:-4], algorithm[0], 'outliers')
+outlier_df.to_csv(outlier_output_filename, index=True, index_label='index')
 print(f'\nOutliers are available at {outlier_output_filename}')
 
 r2_cv = cv_results['test_r2'].mean()

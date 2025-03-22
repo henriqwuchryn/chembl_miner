@@ -24,7 +24,7 @@ results_path = f'analysis/{filename[:-4]}'
 datasets_path = 'datasets'
 
 try:
-    fingerprint_df = pd.read_csv(f'{datasets_path}/{filename}')
+    fingerprint_df = pd.read_csv(f'{datasets_path}/{filename}', index_col='index')
 except:
     if not os.path.exists(f'{datasets_path}/{filename}'):
         print('File does not exist')

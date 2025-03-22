@@ -37,7 +37,7 @@ print('\nCleaning and preprocessing data')
 activity_df : pd.DataFrame = pd.DataFrame(activity_query)
 activity_df = activity_df[
     ['canonical_smiles', 'molecule_chembl_id', 'standard_type',
-    'standard_value', 'standard_units']]
+    'standard_value', 'standard_units', 'assay_description']]
 activity_df['standard_value'] = pd.to_numeric(activity_df['standard_value'], errors='coerce')
 activity_df = activity_df[activity_df['standard_value'] > 0]                        
 activity_df = activity_df.dropna().drop_duplicates("canonical_smiles").reset_index(drop=True)
@@ -66,7 +66,7 @@ activity_df['bioactivity_class'] = bioactivity_class
 print(activity_df['bioactivity_class'].value_counts())
 print(activity_df['neg_log_value'].describe())
 output_filename = mm.generate_unique_filename(datasets_path, target_chembl_id[6:], activity_type.lower())
-activity_df.to_csv(output_filename, index=False)
+activity_df.to_csv(output_filename, index=True, index_label='index')
 print(activity_df)
 print(f'\nResult is avaliable at {output_filename}')
 

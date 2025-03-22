@@ -2,6 +2,25 @@ import pandas as pd
 import numpy as np
 from rdkit import Chem
 from rdkit.Chem import Descriptors, Lipinski
+from padelpy import padeldescriptor, from_smiles
+
+
+def calculate_fingerprint(dataframe, fingerprint):
+    df_smi = dataframe['canonical_smiles']
+    df_smi.to_csv('molecules.smi', sep='\t',  index=False, header=False)
+    print('''\nBeginning descriptor calculation. This will create a descriptors.csv file.
+It can take a couple of hours or more, depending on your dataset size and descriptors chosen.
+You can check the progression at the descriptors.csv.log file that was created on this folder''')
+    padeldescriptor(mol_dir='molecules.smi',
+                    d_file='descriptors.csv',
+                    descriptortypes=fingerprint,
+                    detectaromaticity=True,
+                    standardizenitro=True,
+                    standardizetautomers=True,
+                    threads=-1,
+                    removesalt=True,
+                    log=True,
+                    fingerprints=True)
 
 
 def convert_to_M (molecules_df) -> pd.DataFrame:
