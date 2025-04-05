@@ -143,13 +143,13 @@ if optimize == 1:
             'bootstrap_features': [True, False]  # Whether features are drawn with replacement
         },
         'GradientBoostingRegressor': {
-            'n_estimators': [100, 200, 400], #100
-            'learning_rate': [0.05, 0.1, 0.2], #0.1
-            'max_depth': [3, 5, 7], #3
-            'min_samples_split': [2, 4], #2
-            'min_samples_leaf': [1, 2], #1
-            'subsample': [0.7, 1.0],  # 1.0
-            'max_features': [1.0, 'sqrt', 'log2']  # 1.0
+            'n_estimators': [1200, 1600, 2000], #100
+            'learning_rate': [0.005, 0.01, 0.015], #0.1
+            'max_depth': [21], #3
+            'min_samples_split': [2], #2
+            'min_samples_leaf': [4], #1
+            'subsample': [0.3, 0.5, 0.7],  # 1.0
+            'max_features': ['sqrt']  # 1.0
         },
         'LGBMRegressor': {
             'n_estimators': [100, 200, 400], #100
@@ -173,23 +173,24 @@ if optimize == 1:
             'oob_score': [True, False]  # Whether to use out-of-bag samples for estimation
         },
         'XGBRegressor': {
-            'n_estimators': [50, 100, 200, 300],
-            'learning_rate': [0.15, 0.3, 0.6],
-            'max_depth': [3, 6, 9],
-            'min_child_weight': [1, 2],  # Minimum sum of instance weight needed in a child
-            'gamma': [0, 0.1],  # Minimum loss reduction required to make a split
-            'subsample': [0.7, 1.0],  # Fraction of samples used for fitting
-            'colsample_bytree': [0.7, 1.0],  # Fraction of features used for fitting
-            'reg_alpha': [0, 0.1, 1],  # L1 regularization
-            'reg_lambda': [0, 0.1, 1]  # L2 regularization
+            'n_estimators': [600,800,1200],
+            'learning_rate': [0.01,0.025],
+            'max_depth': [9],
+            'min_child_weight': [0.5,4],  # Minimum sum of instance weight needed in a child
+            'gamma': [0.5],  # Minimum loss reduction required to make a split
+            'subsample': [0.5, 0.7],  # Fraction of samples used for fitting
+            'colsample_bytree': [0.5,0.7],  # Fraction of features used for fitting
+            'reg_alpha': [1],  # L1 regularization
+            'reg_lambda': [1]  # L2 regularization
         },
         'HistGradientBoostingRegressor': {
-            'max_iter': [100, 200, 400], #100
-            'learning_rate': [0.05, 0.1, 0.2], #0.1
-            'max_depth': [6, 9, None], #None
-            'min_samples_leaf': [20, 40], #20
-            'max_leaf_nodes': [31, 62],  #61
-            'l2_regularization': [0, 0.1, 1],  #0
+            'loss': ['squared_error'], #squared_error
+            'max_iter': [1600, 2000], #100
+            'learning_rate': [0.01, 0.025], #0.1
+            'max_depth': [None], #None
+            'min_samples_leaf': [40, 80, 160], #20
+            'max_leaf_nodes': [62, 124],  #61
+            'l2_regularization': [0, 0.5, 1],  #0
             'max_bins': [125, 255]  #255
         },
         'ExtraTreesRegressor': {
