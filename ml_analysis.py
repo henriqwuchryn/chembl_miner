@@ -30,7 +30,7 @@ train_output_filename = f'{datasets_path}/{filename[:-4]}_train.csv'
 test_output_filename = f'{datasets_path}/{filename[:-4]}_test.csv'
 # regex to get the pre-fingerprint filename
 match = re.match(
-    r'^(\d+)_([a-z]+)_(\d+)_([a-z]+\-*[.0-9]+)_([a-z]+[0-9.]+)_\d+\.csv$',
+    r'^(\d+)_([a-z]+\-*[.0-9]+)_(\d+)_([a-z]+\-*[.0-9]+)_([a-z]+[0-9.]+)_\d+\.csv$',
     filename
 )
 if match == None:
@@ -83,8 +83,8 @@ print(f'\n{x_train.head()}')
 use_scaler = input('\nDo you want to use a scaler? 1 or 0\n')
 use_scaler = mm.check_if_int(use_scaler)
 if use_scaler == 1:
-    x_train = mlm.scale_features(x_train, preproc.StandardScaler())
-    x_test = mlm.scale_features(x_test, preproc.StandardScaler())
+    x_train = mlm.scale_features(x_train, preproc.MinMaxScaler())
+    x_test = mlm.scale_features(x_test, preproc.MinMaxScaler())
     print(f'\nFeatures scaled\n{x_train.head()}')
     results_path = f'analysis/{filename[:-4]}/scaled'
 if not os.path.exists(results_path):
@@ -92,14 +92,13 @@ if not os.path.exists(results_path):
 
 #dict structure: index, (name, algorithm)
 algorithms: dict = {
-    1:('AdaBoostRegressor',AdaBoostRegressor(random_state=random_state)),
-    2:('BaggingRegressor',BaggingRegressor(random_state=random_state)),
-    3:('ExtraTreesRegressor',ExtraTreesRegressor(random_state=random_state)),
-    4:('GradientBoostingRegressor',GradientBoostingRegressor(random_state=random_state)),
-    5:('HistGradientBoostingRegressor',HistGradientBoostingRegressor(random_state=random_state)),
-    6:('LGBMRegressor',LGBMRegressor(random_state=random_state,verbosity=1)),
-    7:('RandomForestRegressor',RandomForestRegressor(random_state=random_state)),
-    8:('XGBRegressor',XGBRegressor(random_state=random_state)),
+    1:('BaggingRegressor',BaggingRegressor(random_state=random_state)),
+    2:('ExtraTreesRegressor',ExtraTreesRegressor(random_state=random_state)),
+    3:('GradientBoostingRegressor',GradientBoostingRegressor(random_state=random_state)),
+    4:('HistGradientBoostingRegressor',HistGradientBoostingRegressor(random_state=random_state)),
+    5:('LGBMRegressor',LGBMRegressor(random_state=random_state,verbosity=1)),
+    6:('RandomForestRegressor',RandomForestRegressor(random_state=random_state)),
+    7:('XGBRegressor',XGBRegressor(random_state=random_state)),
 }
 print('\n',pd.DataFrame([(value[0]) for key, value in algorithms.items()],columns=['Algorithm'],index=algorithms.keys()),'\n')
 algorithm_index :str = input(
@@ -136,9 +135,9 @@ if optimize == 1:
     #dict structure: name, params
     param_grids = {
         'BaggingRegressor': {
-            'n_estimators': [10, 20, 40],#10
-            'max_samples': [0.7, 1.0],#1.0
-            'max_features': [0.7, 1.0],#1.0
+            'n_estimators': [10, 80, 320],#10
+            'max_samples': [0.3, 0.7],#1.0
+            'max_features': [0.3, 0.7, 1.0],#1.0
             'bootstrap': [True, False],  # Whether samples are drawn with replacement
             'bootstrap_features': [True, False]  # Whether features are drawn with replacement
         },
@@ -185,11 +184,11 @@ if optimize == 1:
         },
         'HistGradientBoostingRegressor': {
             'loss': ['squared_error'], #squared_error
-            'max_iter': [1600, 2000], #100
-            'learning_rate': [0.01, 0.025], #0.1
+            'max_iter': [400, 1600, 3200], #100
+            'learning_rate': [0.1, 0.01, 0.001], #0.1
             'max_depth': [None], #None
-            'min_samples_leaf': [40, 80, 160], #20
-            'max_leaf_nodes': [62, 124],  #61
+            'min_samples_leaf': [20, 80, 320], #20
+            'max_leaf_nodes': [62, 124, 248],  #61
             'l2_regularization': [0, 0.5, 1],  #0
             'max_bins': [125, 255]  #255
         },
@@ -201,11 +200,6 @@ if optimize == 1:
             'max_features': [1.0, 'sqrt', 'log2'],  # Number of features to consider for splits
             'bootstrap': [True, False],  # Whether bootstrap samples are used
             # 'oob_score': [True, False]  # Whether to use out-of-bag samples for estimation
-        },
-        'AdaBoostRegressor': {
-            'n_estimators': [50, 100, 200], #50
-            'learning_rate': [0.5, 1.0, 2.0], #1.0
-            'loss': ['linear', 'square', 'exponential']  #linear
         }
     }
     if algorithm_index == 0:
