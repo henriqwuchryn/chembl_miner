@@ -1,4 +1,7 @@
 import pandas as pd
+import pickle
+import os
+import sys
 from sklearn.model_selection import train_test_split
 
 class DatasetWrapper:
@@ -14,48 +17,58 @@ class DatasetWrapper:
         self.features_preprocessing = pd.DataFrame()
         self.target_preprocessing = pd.DataFrame()
 
-    def ensure_fixed_indices(self):
-        """
-        Ensures the indices are fixed across all dataframes for traceability.
-        """
-        if not self.general_data.empty:
-            base_index = self.general_data.index
-            self.features_train = self.features_train.reindex(base_index)
-            self.features_test = self.features_test.reindex(base_index)
-            self.target_train = self.target_train.reindex(base_index)
-            self.target_test = self.target_test.reindex(base_index)
 
-    def save_to_csv(self, file_path):
+    def subset_general_data(self, subset='train'):
         """
-        Saves the entire dataset to a single CSV file.
+        Retrieves the corresponding rows from general_data for the train or test dataset.
+        
+        Args:
+            subset (str): 'train' or 'test', indicating which subset to trace. Default value is 'train'.
+        
+        Returns:
+            pd.DataFrame: Rows from general_data corresponding to the specified subset.
         """
-        combined = {
-            "general_data": self.general_data,
-            "features_train": self.features_train,
-            "features_test": self.features_test,
-            "target_train": self.target_train,
-            "target_test": self.target_test,
-            "features_preprocessing": self.features_preprocessing,
-            "target_preprocessing": self.target_preprocessing,
-        }
-        # Add keys to differentiate dataframes when saving
-        output_df = pd.concat(combined, axis=1)
-        output_df.to_csv(file_path)
+        if subset == 'train':
+            return self.general_data.loc[self.features_train.index]
+        elif subset == 'test':
+            return self.general_data.loc[self.features_test.index]
+        else:
+            raise ValueError("Subset must be 'train' or 'test'.")
+
+
+    def save(self, file_path):
+        """
+        Saves the entire dataset to CSV files.
+        """
+
+        if not os.path.exists(file_path):
+           os.mkdirs(file_path)
+
+        self.general_data.to_csv(f'{file_path}/gd.csv', index_label='index')
+        self.features_train.to_csv(f'{file_path}/ftr.csv', index_label='index')
+        self.features_test.to_csv(f'{file_path}/fte.csv', index_label='index')
+        self.target_train.to_csv(f'{file_path}/ttr.csv', index_label='index')
+        self.target_test.to_csv(f'{file_path}/tte.csv', index_label='index')
+        self.features_preprocessing.to_csv(f'{file_path}/fpr.csv', index_label='index')
+        self.target_preprocessing.to_csv(f'{file_path}/tpr.csv', index_label='index')
         print(f"Dataset saved to {file_path}")
 
-    def load_from_csv(self, file_path):
+    def load(self, file_path):
         """
-        Loads the dataset from a single CSV file.
+        Loads the dataset from CSV files.
         """
-        combined_df = pd.read_csv(file_path, header=[0, 1], index_col=0)
-        self.general_data = combined_df["general_data"]
-        self.features_train = combined_df["features_train"]
-        self.features_test = combined_df["features_test"]
-        self.target_train = combined_df["target_train"]
-        self.target_test = combined_df["target_test"]
-        self.features_preprocessing = combined_df.get("features_preprocessing", pd.DataFrame())
-        self.target_preprocessing = combined_df.get("target_preprocessing", pd.DataFrame())
-        print(f"Dataset loaded from {file_path}")
+        try:
+            self.general_data = pd.read_csv(f'{file_path}/gd.csv', index_col='index')
+            self.features_train = pd.read_csv(f'{file_path}/ftr.csv', index_col='index')
+            self.features_test = pd.read_csv(f'{file_path}/fte.csv', index_col='index')
+            self.target_train = pd.read_csv(f'{file_path}/ttr.csv', index_col='index')
+            self.target_test = pd.read_csv(f'{file_path}/tte.csv', index_col='index')
+            self.features_preprocessing = pd.read_csv(f'{file_path}/fpr.csv', index_col='index')
+            self.target_preprocessing = pd.read_csv(f'{file_path}/tpr.csv', index_col='index')
+            print(f"Dataset loaded from {file_path}")
+        except Exception as e:
+            print(e)
+            print("Dataset loading failed")
 
     def load_unsplit_csv(self, file_path, general_columns, target_column, test_size=0.2, random_state=42):
         """
@@ -66,25 +79,21 @@ class DatasetWrapper:
             file_path (str): Path to the CSV file.
             general_columns (list): List of columns representing general data.
             target_column (str): Column name representing the target variable.
-            test_size (float): Proportion of the dataset to include in the test split.
-            random_state (int): Random state for reproducibility.
+            test_size (float): Proportion of the dataset to include in the test split. Standard value = 0.2.
+            random_state (int): Random state for reproducibility. Standard value = 42.
         """
         # Load the unsplit CSV file
         full_df = pd.read_csv(file_path, index_col=0)
-        
         # Extract general data
         self.general_data = full_df[general_columns]
-
         # Exclude general and target columns to get feature columns dynamically
         features = full_df.drop(columns=general_columns + [target_column])
         target = full_df[target_column]
-
         # Split the dataset
         self.features_train, self.features_test, self.target_train, self.target_test = train_test_split(
             features, target, test_size=test_size, random_state=random_state
         )
         print(f"Unsplit dataset loaded and split into train/test sets from {file_path}")
-
         # Create preprocessing dataset
         self.create_preprocessing_dataset()
 
@@ -107,10 +116,14 @@ class DatasetWrapper:
             print("Preprocessing dataset uses the entire train dataset.")
 
     @staticmethod
-    def from_csv(file_path):
-        """
-        Static method to create an instance of DatasetWrapper from a CSV file.
-        """
+    def load_dataset(file_path):
         instance = DatasetWrapper()
-        instance.load_from_csv(file_path)
+        instance.load(file_path)
+        return instance
+
+
+    @staticmethod
+    def load_raw_dataset(file_path, general_columns, target_column, test_size=0.2, random_state=42):
+        instance = DatasetWrapper()
+        instance.load_unsplit_csv(file_path, general_columns, target_column, test_size=0.2, random_state=42)
         return instance
