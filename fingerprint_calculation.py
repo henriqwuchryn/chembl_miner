@@ -1,5 +1,6 @@
 import pandas as pd
 import glob
+import numpy as np
 import miscelanneous_methods as mm
 import molecules_manipulation_methods as mmm
 import machine_learning_methods as mlm
@@ -94,11 +95,11 @@ else:
         datasets_path, filename[:-4], f'fp{fingerprint_index}')
 
 fingerprint_df = pd.concat([
-    activity_df['molecule_chembl_id'],
-    activity_df['neg_log_value'],
-    activity_df['bioactivity_class'],
+    activity_df,
     descriptors_df],
     axis = 1)
+fingerprint_df.replace([np.inf, -np.inf], np.nan, inplace=True)
+fingerprint_df.dropna(inplace=True)
 print('\n',fingerprint_df)
 fingerprint_df.to_csv(output_filename, index=True, index_label='index')
 print(f'\nResult is avaliable at {output_filename}')

@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import miscelanneous_methods as mm
 import machine_learning_methods as mlm
+from dataset_wrapper import DatasetWrapper
 import joblib
 from sklearn.ensemble import *
 import sklearn.preprocessing as preproc
@@ -25,71 +26,16 @@ except:
     quit()
 
 results_path = f'analysis/{filename[:-4]}'
-datasets_path = 'datasets'
-train_output_filename = f'{datasets_path}/{filename[:-4]}_train.csv'
-test_output_filename = f'{datasets_path}/{filename[:-4]}_test.csv'
-# regex to get the pre-fingerprint filename
-match = re.match(
-    r'^(\d+)_([a-z]+\-*[.0-9]+)_(\d+)_([a-z]+\-*[.0-9]+)(_([a-z]+[0-9.]+))?_\d+\.csv$',
-    filename
-)
-if match == None:
-    print('Invalid filename')
-    quit()
-activity_filename = f'{match.group(1)}_{match.group(2)}_{match.group(3)}.csv'
-
-if not (os.path.exists(train_output_filename) and os.path.exists(test_output_filename)):
-    try:
-        fingerprint_df = pd.read_csv(f'{datasets_path}/{filename}', index_col='index')
-    except:
-        if not os.path.exists(f'{datasets_path}/{filename}'):
-            print('File does not exist')
-        else:
-            print('Invalid file - cannot convert to dataframe')
-        quit()
-    fingerprint_df.replace([np.inf, -np.inf], np.nan, inplace=True)
-    fingerprint_df.dropna(inplace=True)
-    features_df = fingerprint_df.drop(
-        ['molecule_chembl_id','neg_log_value','bioactivity_class'],axis=1)
-    target_df = fingerprint_df['neg_log_value']
-    print('splitting')
-    print(fingerprint_df)
-    x_train, x_test, y_train, y_test = model_selection.train_test_split(
-        features_df, target_df, test_size=0.2, random_state=random_state)
-    train_df = pd.concat([x_train, y_train], axis=1)
-    train_df.to_csv(train_output_filename, index=True, index_label='index')
-    test_df = pd.concat([x_test, y_test], axis=1)
-    test_df.to_csv(test_output_filename, index=True, index_label='index')
-    print(f'Number of samples is: {features_df.shape[0]}')
-else:
-    try:
-        print('reusing split')
-        train_df = pd.read_csv(train_output_filename, index_col='index')
-        x_train = train_df.drop('neg_log_value', axis=1)
-        y_train = train_df['neg_log_value']
-        test_df = pd.read_csv(test_output_filename, index_col='index')
-        x_test = test_df.drop('neg_log_value', axis=1)
-        y_test = test_df['neg_log_value']
-        print(f'Number of samples is: {x_train.shape[0]+x_test.shape[0]}')
-    except Exception as e:
-        print('Invalid files')
-        print(e)
-        quit()
-
-print(f'Number of features is: {x_train.shape[1]}')
-print(f'size of train set is: {x_train.shape[0]}')
-print(f'size of test set is: {x_test.shape[0]}')
-print(f'\n{x_train.head()}')
-use_scaler = input('\nDo you want to use a scaler? 1 or 0\n')
-use_scaler = mm.check_if_int(use_scaler)
-if use_scaler == 1:
-    x_train = mlm.scale_features(x_train, preproc.MinMaxScaler())
-    x_test = mlm.scale_features(x_test, preproc.MinMaxScaler())
-    print(f'\nFeatures scaled\n{x_train.head()}')
-    results_path = f'analysis/{filename[:-4]}/scaled'
 if not os.path.exists(results_path):
     os.makedirs(results_path)
+datasets_folder = 'datasets'
+datasets_path = f'{datasets_folder}/{filename[:-4]}'
+parameter_path = 'config/parameter_grids'
 
+general_columns = ["canonical_smiles","molecule_chembl_id","standard_type","standard_value","standard_units","assay_description","MW","LogP","NumHDonors","NumHAcceptors","Ro5Violations","bioactivity_class"]
+target_column = 'neg_log_value'
+
+#Available algorithms
 #dict structure: index, (name, algorithm)
 algorithms: dict = {
     1:('BaggingRegressor',BaggingRegressor(random_state=random_state)),
@@ -100,7 +46,7 @@ algorithms: dict = {
     6:('RandomForestRegressor',RandomForestRegressor(random_state=random_state)),
     7:('XGBRegressor',XGBRegressor(random_state=random_state)),
 }
-print('\n',pd.DataFrame([(value[0]) for key, value in algorithms.items()],columns=['Algorithm'],index=algorithms.keys()),'\n')
+print(f"\n{pd.DataFrame([(value[0]) for key, value in algorithms.items()],columns=['Algorithm'],index=algorithms.keys())}\n")
 algorithm_index :str = input(
     'Choose which algorithm to use by inserting the index. 0 for all.\n')
 algorithm_index = mm.check_if_int(algorithm_index)
@@ -121,7 +67,7 @@ else:
     if confirmation == 1:
         print('\nAll algorithms will be used')
     else:
-        print('\nIndex does not correspond to an algorithm')
+        print('\nQuitting')
         quit()
 
 scoring = { #defining scoring metrics for optimization
@@ -131,12 +77,23 @@ scoring = { #defining scoring metrics for optimization
     'mae': metrics.make_scorer(metrics.mean_absolute_error)
 }
 
+if not os.path.exists(f'{datasets_path}/gd.csv'):
+    data = DatasetWrapper().load_raw_dataset(
+            f'{datasets_folder}/{filename}',
+            general_columns,
+            target_column)
+    data.save(datasets_path)
+else:
+    data = DatasetWrapper().load_dataset(datasets_path)
+
+data.describe()
+
 if optimize == 1:
     #dict structure: name, params
-    if not os.path.exists('config/parameter_grids'):
+    if not os.path.exists(parameter_path):
         print('\nNo parameter_grids file on config folder')
         quit()
-    with open('config/parameter_grids','r') as file:
+    with open(parameter_path,'r') as file:
         param_grids = eval(file.read())
 
     if algorithm_index == 0:
@@ -146,7 +103,7 @@ if optimize == 1:
             except:
                 print('no parameter grid for chosen algorithm')
             search_cv_results, best_params, time_to_execute = mlm.evaluate_and_optimize(
-                alg, param_grids[name], x_train, y_train, scoring, name)
+                alg, param_grids[name], data.x_preprocessing, data.y_preprocessing, scoring, name)
             search_output_filename = mm.generate_unique_filename(
                 results_path, name, 'gridsearch')
             search_cv_results.to_csv(search_output_filename)
@@ -159,7 +116,7 @@ if optimize == 1:
 
     else:
         search_cv_results, best_params, time_to_execute = mlm.evaluate_and_optimize(
-            algorithm[1], param_grids[algorithm[0]], x_train, y_train, scoring, algorithm[0])
+            algorithm[1], param_grids[algorithm[0]], data.x_preprocessing, data.y_preprocessing, scoring, algorithm[0])
         search_output_filename = mm.generate_unique_filename(
             results_path, algorithm[0], 'gridsearch')
         search_cv_results.to_csv(search_output_filename)
@@ -180,24 +137,22 @@ except: #if above fails, ask for input
         quit()
 
 optimized_algorithm = algorithm[1].set_params(**params)
+
 print('\nPerforming supervised outlier removal')
-
 x_train_clean, y_train_clean, cv_results = mlm.supervised_outlier_removal(
-    algorithm=optimized_algorithm, x_train=x_train, y_train= y_train,
+    algorithm=optimized_algorithm, x_train=data.x_train, y_train= data.y_train,
     scoring=scoring, algorithm_name=algorithm[0])
-print('Number of samples before cleaning:', x_train.shape[0])
+print('Number of samples before cleaning:', data.x_train.shape[0])
 print('Number of samples after cleaning:', x_train_clean.shape[0])
-print(f'Removed {round(((x_train.shape[0]-x_train_clean.shape[0])/x_train.shape[0]*100),2)}% of samples')
-
-activity_df = pd.read_csv(f'{datasets_path}/{activity_filename}', index_col='index')
-full_df = pd.concat([activity_df,x_train], axis=1)
-outlier_mask = np.logical_not(full_df.index.isin(x_train_clean.index))
-outlier_df = full_df[outlier_mask]
+print(f'Removed {round(((data.x_train.shape[0]-x_train_clean.shape[0])/data.x_train.shape[0]*100),2)}% of samples')
+outlier_mask = np.logical_not(data.general_data.index.isin(x_train_clean.index))
+outlier_df = data.general_data[outlier_mask]
 outlier_output_filename = mm.generate_unique_filename(
-    datasets_path, filename[:-4], algorithm[0], 'outliers')
+    datasets_folder, filename[:-4], algorithm[0], 'outliers')
 outlier_df.to_csv(outlier_output_filename, index=True, index_label='index')
 print(f'\nOutliers are available at {outlier_output_filename}')
 
+#assembling cv_results dataframe
 r2_cv = cv_results['test_r2'].mean()
 rmse_cv = cv_results['test_rmse'].mean()
 mae_cv = cv_results['test_mae'].mean()
@@ -209,9 +164,11 @@ mae_train = cv_results['train_mae'].mean()
 score_df_train = pd.DataFrame(
     {'r2':r2_train, 'rmse':rmse_train, 'mae':mae_train}, index=['score_train'])
 
+print('Evaluating model with cleaned data')
 cv_results_clean = model_selection.cross_validate(
     estimator=optimized_algorithm, X=x_train_clean, y=y_train_clean, cv=10,
     scoring=scoring, return_train_score=True)
+#assembling cv_results_clean dataframe
 r2_cv_clean = cv_results_clean['test_r2'].mean()
 rmse_cv_clean = cv_results_clean['test_rmse'].mean()
 mae_cv_clean = cv_results_clean['test_mae'].mean()
