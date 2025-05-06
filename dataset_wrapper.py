@@ -5,17 +5,18 @@ import sys
 from sklearn.model_selection import train_test_split
 
 class DatasetWrapper:
-    def __init__(self, general_data=None, features_train=None, features_test=None, target_train=None, target_test=None):
+    def __init__(self, general_data=None, x_train=None, x_test=None, y_train=None, y_test=None):
         """
         Initializes the DatasetWrapper with optional dataframes.
         """
         self.general_data = general_data if general_data is not None else pd.DataFrame()
-        self.features_train = features_train if features_train is not None else pd.DataFrame()
-        self.features_test = features_test if features_test is not None else pd.DataFrame()
-        self.target_train = target_train if target_train is not None else pd.DataFrame()
-        self.target_test = target_test if target_test is not None else pd.DataFrame()
-        self.features_preprocessing = pd.DataFrame()
-        self.target_preprocessing = pd.DataFrame()
+        self.x_train = x_train if x_train is not None else pd.DataFrame()
+        self.x_test = x_test if x_test is not None else pd.DataFrame()
+        self.y_train = y_train if y_train is not None else pd.DataFrame()
+        self.y_test = y_test if y_test is not None else pd.DataFrame()
+        self.x_preprocessing = pd.DataFrame()
+        self.y_preprocessing = pd.DataFrame()
+        self.file_path = ''
 
 
     def subset_general_data(self, subset='train'):
@@ -29,9 +30,9 @@ class DatasetWrapper:
             pd.DataFrame: Rows from general_data corresponding to the specified subset.
         """
         if subset == 'train':
-            return self.general_data.loc[self.features_train.index]
+            return self.general_data.loc[self.x_train.index]
         elif subset == 'test':
-            return self.general_data.loc[self.features_test.index]
+            return self.general_data.loc[self.x_test.index]
         else:
             raise ValueError("Subset must be 'train' or 'test'.")
 
@@ -42,15 +43,15 @@ class DatasetWrapper:
         """
 
         if not os.path.exists(file_path):
-           os.mkdirs(file_path)
+           os.makedirs(file_path)
 
         self.general_data.to_csv(f'{file_path}/gd.csv', index_label='index')
-        self.features_train.to_csv(f'{file_path}/ftr.csv', index_label='index')
-        self.features_test.to_csv(f'{file_path}/fte.csv', index_label='index')
-        self.target_train.to_csv(f'{file_path}/ttr.csv', index_label='index')
-        self.target_test.to_csv(f'{file_path}/tte.csv', index_label='index')
-        self.features_preprocessing.to_csv(f'{file_path}/fpr.csv', index_label='index')
-        self.target_preprocessing.to_csv(f'{file_path}/tpr.csv', index_label='index')
+        self.x_train.to_csv(f'{file_path}/ftr.csv', index_label='index')
+        self.x_test.to_csv(f'{file_path}/fte.csv', index_label='index')
+        self.y_train.to_csv(f'{file_path}/ttr.csv', index_label='index')
+        self.y_test.to_csv(f'{file_path}/tte.csv', index_label='index')
+        self.x_preprocessing.to_csv(f'{file_path}/fpr.csv', index_label='index')
+        self.y_preprocessing.to_csv(f'{file_path}/tpr.csv', index_label='index')
         print(f"Dataset saved to {file_path}")
 
     def load(self, file_path):
@@ -59,12 +60,13 @@ class DatasetWrapper:
         """
         try:
             self.general_data = pd.read_csv(f'{file_path}/gd.csv', index_col='index')
-            self.features_train = pd.read_csv(f'{file_path}/ftr.csv', index_col='index')
-            self.features_test = pd.read_csv(f'{file_path}/fte.csv', index_col='index')
-            self.target_train = pd.read_csv(f'{file_path}/ttr.csv', index_col='index')
-            self.target_test = pd.read_csv(f'{file_path}/tte.csv', index_col='index')
-            self.features_preprocessing = pd.read_csv(f'{file_path}/fpr.csv', index_col='index')
-            self.target_preprocessing = pd.read_csv(f'{file_path}/tpr.csv', index_col='index')
+            self.x_train = pd.read_csv(f'{file_path}/ftr.csv', index_col='index')
+            self.x_test = pd.read_csv(f'{file_path}/fte.csv', index_col='index')
+            self.y_train = pd.read_csv(f'{file_path}/ttr.csv', index_col='index')['neg_log_value']
+            self.y_test = pd.read_csv(f'{file_path}/tte.csv', index_col='index')['neg_log_value']
+            self.x_preprocessing = pd.read_csv(f'{file_path}/fpr.csv', index_col='index')
+            self.y_preprocessing = pd.read_csv(f'{file_path}/tpr.csv', index_col='index')['neg_log_value']
+            self.file_path = file_path
             print(f"Dataset loaded from {file_path}")
         except Exception as e:
             print(e)
@@ -73,7 +75,7 @@ class DatasetWrapper:
     def load_unsplit_csv(self, file_path, general_columns, target_column, test_size=0.2, random_state=42):
         """
         Loads an unsplit CSV file containing all columns and splits it into
-        general_data, features_train/test, and target_train/test.
+        general_data, x_train/test, and y_train/test.
         
         Args:
             file_path (str): Path to the CSV file.
@@ -82,17 +84,26 @@ class DatasetWrapper:
             test_size (float): Proportion of the dataset to include in the test split. Standard value = 0.2.
             random_state (int): Random state for reproducibility. Standard value = 42.
         """
-        # Load the unsplit CSV file
-        full_df = pd.read_csv(file_path, index_col=0)
-        # Extract general data
-        self.general_data = full_df[general_columns]
-        # Exclude general and target columns to get feature columns dynamically
-        features = full_df.drop(columns=general_columns + [target_column])
-        target = full_df[target_column]
+        try:
+            full_df = pd.read_csv(file_path, index_col='index')
+            print(full_df)
+            print(full_df.columns)
+        except Exception as e:
+            print(e)
+            print('\nUnsplit CSV file does not exist')
+        try:
+            self.general_data = full_df[general_columns]
+            target = full_df[target_column]
+            not_feature_columns = general_columns + [target_column]
+            features = full_df.drop(columns=not_feature_columns)
+        except KeyError as e:
+            print(e)
+            print('\nUnsplit CSV file does not contain the correct columns')
         # Split the dataset
-        self.features_train, self.features_test, self.target_train, self.target_test = train_test_split(
+        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(
             features, target, test_size=test_size, random_state=random_state
         )
+        self.file_path = file_path
         print(f"Unsplit dataset loaded and split into train/test sets from {file_path}")
         # Create preprocessing dataset
         self.create_preprocessing_dataset()
@@ -106,14 +117,23 @@ class DatasetWrapper:
         Args:
             max_samples (int): Number of samples to use for preprocessing if the train dataset is large.
         """
-        if len(self.features_train) > 10000:
-            self.features_preprocessing = self.features_train.sample(n=max_samples, random_state=42)
-            self.target_preprocessing = self.target_train.loc[self.features_preprocessing.index]
+        if len(self.x_train) > 10000:
+            self.x_preprocessing = self.x_train.sample(n=max_samples, random_state=42)
+            self.y_preprocessing = self.y_train.loc[self.x_preprocessing.index]
             print(f"Preprocessing dataset created with {max_samples} samples.")
         else:
-            self.features_preprocessing = self.features_train
-            self.target_preprocessing = self.target_train
+            self.x_preprocessing = self.x_train
+            self.y_preprocessing = self.y_train
             print("Preprocessing dataset uses the entire train dataset.")
+
+
+    def describe(self):
+        size = self.general_data.shape[0]
+        features = self.x_train.shape[1]
+        size_train = self.y_train.shape[0]
+        size_test = self.y_test.shape[0]
+        print(f'Dataset obtained from {self.file_path}\n\nDataset size: {size}\nNumber of features: {features}\nTrain subset size: {size_train}\nTest subset size: {size_test}')
+
 
     @staticmethod
     def load_dataset(file_path):
@@ -124,6 +144,7 @@ class DatasetWrapper:
 
     @staticmethod
     def load_raw_dataset(file_path, general_columns, target_column, test_size=0.2, random_state=42):
+
         instance = DatasetWrapper()
         instance.load_unsplit_csv(file_path, general_columns, target_column, test_size=0.2, random_state=42)
         return instance

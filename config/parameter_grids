@@ -28,13 +28,13 @@
             'force_row_wise': [True]
         },
         'RandomForestRegressor': {
-            'n_estimators': [100, 200, 400], #100
-            'max_depth': [6, 9, None], #None
-            'min_samples_split': [2, 4], #2
-            'min_samples_leaf': [1, 2], #1
-            'max_features': [1.0, 'sqrt', 'log2'],  # 1.0
-            'bootstrap': [True, False],  # Whether bootstrap samples are used
-            'oob_score': [True, False]  # Whether to use out-of-bag samples for estimation
+            'n_estimators': [300,400,500], #100
+            'max_depth': [None], #None
+            'min_samples_split': [1,2,8,16], #2
+            'min_samples_leaf': [3,4,5], #1
+            'max_features': [1.0, 0.7],  # 1.0
+            'bootstrap': [True],  # Whether bootstrap samples are used
+            'oob_score': [False]  # Whether to use out-of-bag samples for estimation
         },
         'XGBRegressor': {
             'n_estimators': [600,800,1200],

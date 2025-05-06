@@ -5,3 +5,4 @@ __pycache__/
 fingerprint_used
 descriptors*
 molecules.smi
+config/
