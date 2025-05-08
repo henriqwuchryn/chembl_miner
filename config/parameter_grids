@@ -28,11 +28,11 @@
             'force_row_wise': [True]
         },
         'RandomForestRegressor': {
-            'n_estimators': [300,400,500], #100
+            'n_estimators': Integer(lower = 100, upper = 800), #100
             'max_depth': [None], #None
-            'min_samples_split': [1,2,8,16], #2
-            'min_samples_leaf': [3,4,5], #1
-            'max_features': [1.0, 0.7],  # 1.0
+            'min_samples_split': Integer(lower=2, upper=16), #2
+            'min_samples_leaf': Integer(lower=1, upper=8), #1
+            'max_features': Continuous(lower=0.3, upper=1),  # 1.0
             'bootstrap': [True],  # Whether bootstrap samples are used
             'oob_score': [False]  # Whether to use out-of-bag samples for estimation
         },

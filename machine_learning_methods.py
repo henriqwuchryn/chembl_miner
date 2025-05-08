@@ -1,4 +1,5 @@
 import sklearn.model_selection as model_selection
+from sklearn_genetic import GASearchCV
 import numpy as np
 import pandas as pd
 import time
@@ -7,7 +8,7 @@ import os
 
 
 def supervised_outlier_removal(algorithm, x_train, y_train, scoring, algorithm_name, cv = 10):
-    cv_results = model_selection.cross_validate(estimator=algorithm, X=x_train, y=y_train,
+    cv_results = model_selection.cross_va lidate(estimator=algorithm, X=x_train, y=y_train,
         cv=cv, scoring=scoring, return_estimator=True, return_indices=True, return_train_score=True)
     residues = pd.Series().astype(float)
 
@@ -30,7 +31,7 @@ def evaluate_and_optimize(algorithm, params, x_train, y_train, scoring, algorith
     start_time = time.time()
     print(f"\nOptimizing {algorithm_name}")
     print(f"Parameters: {params}")
-    grid_search = model_selection.GridSearchCV(
+    grid_search = GASearchCV(
         estimator=algorithm, param_grid=params, scoring=scoring, refit='r2', n_jobs=-1, return_train_score=True)
     print('\nFitting\n')
     grid_search.fit(x_train, y_train)                                   

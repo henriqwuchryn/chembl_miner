@@ -7,6 +7,7 @@ import pandas as pd
 import miscelanneous_methods as mm
 import machine_learning_methods as mlm
 from dataset_wrapper import DatasetWrapper
+from sklearn_genetic.space import Categorical, Integer, Continuous
 import joblib
 from sklearn.ensemble import *
 import sklearn.preprocessing as preproc
@@ -95,6 +96,8 @@ if optimize == 1:
         quit()
     with open(parameter_path,'r') as file:
         param_grids = eval(file.read())
+    print(param_grids)
+    
 
     if algorithm_index == 0:
         for index, (name, alg) in algorithms.items():
