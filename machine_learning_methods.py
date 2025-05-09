@@ -1,5 +1,7 @@
 import sklearn.model_selection as model_selection
+from sklearn_genetic.callbacks import ConsecutiveStopping
 from sklearn_genetic import GASearchCV
+from sklearn_genetic.space import Space
 import numpy as np
 import pandas as pd
 import time
@@ -8,7 +10,7 @@ import os
 
 
 def supervised_outlier_removal(algorithm, x_train, y_train, scoring, algorithm_name, cv = 10):
-    cv_results = model_selection.cross_va lidate(estimator=algorithm, X=x_train, y=y_train,
+    cv_results = model_selection.cross_validate(estimator=algorithm, X=x_train, y=y_train,
         cv=cv, scoring=scoring, return_estimator=True, return_indices=True, return_train_score=True)
     residues = pd.Series().astype(float)
 
@@ -30,11 +32,14 @@ def supervised_outlier_removal(algorithm, x_train, y_train, scoring, algorithm_n
 def evaluate_and_optimize(algorithm, params, x_train, y_train, scoring, algorithm_name):
     start_time = time.time()
     print(f"\nOptimizing {algorithm_name}")
-    print(f"Parameters: {params}")
+    print(f"Parameters: {Space(params).parameters}")
     grid_search = GASearchCV(
-        estimator=algorithm, param_grid=params, scoring=scoring, refit='r2', n_jobs=-1, return_train_score=True)
+        estimator=algorithm, param_grid=params, scoring=scoring,
+        population_size=30, generations=30,
+        refit='r2', n_jobs=-1, return_train_score=True)
     print('\nFitting\n')
-    grid_search.fit(x_train, y_train)                                   
+    callback = ConsecutiveStopping(generations=5)
+    grid_search.fit(x_train, y_train, callbacks=callback)
     search_cv_results = pd.DataFrame(grid_search.cv_results_)
     best_params = grid_search.best_params_
     time_to_execute = time.time()-start_time

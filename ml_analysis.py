@@ -96,8 +96,6 @@ if optimize == 1:
         quit()
     with open(parameter_path,'r') as file:
         param_grids = eval(file.read())
-    print(param_grids)
-    
 
     if algorithm_index == 0:
         for index, (name, alg) in algorithms.items():
