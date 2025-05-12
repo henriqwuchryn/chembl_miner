@@ -1,0 +1,4 @@
+{
+    'generations': 20,
+    'population_size': 20
+    }

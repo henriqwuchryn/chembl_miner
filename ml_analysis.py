@@ -32,6 +32,7 @@ if not os.path.exists(results_path):
 datasets_folder = 'datasets'
 datasets_path = f'{datasets_folder}/{filename[:-4]}'
 parameter_path = 'config/parameter_grids'
+config_path = 'config/config'
 
 general_columns = ["canonical_smiles","molecule_chembl_id","standard_type","standard_value","standard_units","assay_description","MW","LogP","NumHDonors","NumHAcceptors","Ro5Violations","bioactivity_class"]
 target_column = 'neg_log_value'
@@ -43,9 +44,8 @@ algorithms: dict = {
     2:('ExtraTreesRegressor',ExtraTreesRegressor(random_state=random_state)),
     3:('GradientBoostingRegressor',GradientBoostingRegressor(random_state=random_state)),
     4:('HistGradientBoostingRegressor',HistGradientBoostingRegressor(random_state=random_state)),
-    5:('LGBMRegressor',LGBMRegressor(random_state=random_state,verbosity=1)),
-    6:('RandomForestRegressor',RandomForestRegressor(random_state=random_state)),
-    7:('XGBRegressor',XGBRegressor(random_state=random_state)),
+    5:('RandomForestRegressor',RandomForestRegressor(random_state=random_state)),
+    6:('XGBRegressor',XGBRegressor(random_state=random_state)),
 }
 print(f"\n{pd.DataFrame([(value[0]) for key, value in algorithms.items()],columns=['Algorithm'],index=algorithms.keys())}\n")
 algorithm_index :str = input(
@@ -54,8 +54,9 @@ algorithm_index = mm.check_if_int(algorithm_index)
 
 if algorithm_index != 0:
     try:
-        algorithm = algorithms[algorithm_index]
-        print('\nAlgorithm chosen:',algorithm[0])
+        alg = algorithms[algorithm_index][1]
+        name = algorithms[algorithm_index][0]
+        print('\nAlgorithm chosen:',name)
         optimize = input('\nDo you want to optimize the algorithms? 1 or 0\n')
         optimize = mm.check_if_int(optimize)
     except:
@@ -95,63 +96,99 @@ if optimize == 1:
         print('\nNo parameter_grids file on config folder')
         quit()
     with open(parameter_path,'r') as file:
-        param_grids = eval(file.read())
+        params_dict = eval(file.read())
+
+    try:
+        with open(config_path,'r') as file:
+            config = eval(file.read())
+            gen = config['generations']
+            pop = config['population_size']
+    except:
+        gen = 30
+        pop = 30
 
     if algorithm_index == 0:
         for index, (name, alg) in algorithms.items():
             try:
-                param_grids[name]
-            except:
-                print('no parameter grid for chosen algorithm')
-            search_cv_results, best_params, time_to_execute = mlm.evaluate_and_optimize(
-                alg, param_grids[name], data.x_preprocessing, data.y_preprocessing, scoring, name)
+                params = params_dict[name]
+            except Exception as e:
+                print(e)
+                print(f'\nNo parameters for {name} in {parameter_path}')
+                continue
+
+            search_cv_results, best_params, time = mlm.evaluate_and_optimize(
+                algorithm=alg,
+                params=params,
+                x_train=data.x_preprocessing,
+                y_train=data.y_preprocessing,
+                scoring=scoring,
+                algorithm_name=name,
+                generations=gen,
+                population_size=pop)
             search_output_filename = mm.generate_unique_filename(
-                results_path, name, 'gridsearch')
-            search_cv_results.to_csv(search_output_filename)
+                results_path, name, 'paramsearch')
             search_txtoutput_filename = mm.generate_unique_filename(
                 results_path, name, 'bestparams', 'time', suffix='.txt')
+            search_cv_results.to_csv(search_output_filename)
             with open(search_txtoutput_filename, 'w') as file:
-                file.write(f'Evaluated parameters: {str(param_grids[name])}\nBest parameters: {str(best_params)}\nTime to run: {time_to_execute}\n') # writing parameters to text file
+                file.write(f'Evaluated parameters: {mlm.describe_params(params)}\nBest parameters: {str(best_params)}\nTime to run: {time}\n') # writing parameters to text file
         print(f"\nOptimization completed. Results saved to {search_output_filename}.")
         quit() # following code only supports one algorithm at a time
 
     else:
-        search_cv_results, best_params, time_to_execute = mlm.evaluate_and_optimize(
-            algorithm[1], param_grids[algorithm[0]], data.x_preprocessing, data.y_preprocessing, scoring, algorithm[0])
+        params = params_dict[name]
+        try:
+            params = params_dict[name]
+        except Exception as e:
+            print(e)
+            print(f'\nNo parameters for {name} in {parameter_path}')
+            print('Quitting')
+            quit()
+        search_cv_results, best_params, time = mlm.evaluate_and_optimize(
+            algorithm=alg,
+            params=params,
+            x_train=data.x_preprocessing,
+            y_train=data.y_preprocessing,
+            scoring=scoring,
+            algorithm_name=name,
+            generations=gen,
+            population_size=pop)
         search_output_filename = mm.generate_unique_filename(
-            results_path, algorithm[0], 'gridsearch')
-        search_cv_results.to_csv(search_output_filename)
+            results_path, name, 'paramsearch')
         search_txtoutput_filename = mm.generate_unique_filename(
-            results_path, algorithm[0], 'bestparams', 'time', suffix='.txt')
+            results_path, name, 'bestparams', 'time', suffix='.txt')
+        search_cv_results.to_csv(search_output_filename)
         with open(search_txtoutput_filename, 'w') as file:
-            file.write(f'Evaluated parameters: {str(param_grids[algorithm[0]])}\nBest parameters: {str(best_params)}\nTime to run: {time_to_execute}\n') # writing parameters to text file
+            file.write(f'Evaluated parameters: {mlm.describe_params(params)}\nBest parameters: {str(best_params)}\nTime to run: {time}\n') # writing parameters to text file
         print(f"\nOptimization completed. Results saved to {search_output_filename}, {search_txtoutput_filename}.")
 
 try:
     params = best_params
 except: #if above fails, ask for input
-    params = input(f'Insert the best parameters for the algorithm {algorithm[0]}\n')
+    params = input(f'Insert the best parameters for the algorithm {name}\n')
     try:
         params = dict(eval(params))
     except:
         print('\nInvalid parameters')
         quit()
 
-optimized_algorithm = algorithm[1].set_params(**params)
+optimized_algorithm = alg.set_params(**params)
 
 print('\nPerforming supervised outlier removal')
 x_train_clean, y_train_clean, cv_results = mlm.supervised_outlier_removal(
     algorithm=optimized_algorithm, x_train=data.x_train, y_train= data.y_train,
-    scoring=scoring, algorithm_name=algorithm[0])
+    scoring=scoring, algorithm_name=name)
 print('Number of samples before cleaning:', data.x_train.shape[0])
 print('Number of samples after cleaning:', x_train_clean.shape[0])
 print(f'Removed {round(((data.x_train.shape[0]-x_train_clean.shape[0])/data.x_train.shape[0]*100),2)}% of samples')
 outlier_mask = np.logical_not(data.general_data.index.isin(x_train_clean.index))
-outlier_df = data.general_data[outlier_mask]
+outlier_general = data.general_data[outlier_mask]
+outlier_target = data.y_train[outlier_mask]
+outlier_df = pd.concat([outlier_general, outlier_target],axis=1)
 outlier_output_filename = mm.generate_unique_filename(
-    datasets_folder, filename[:-4], algorithm[0], 'outliers')
+    datasets_folder, filename[:-4], name, 'outliers')
 outlier_df.to_csv(outlier_output_filename, index=True, index_label='index')
-print(f'\nOutliers are available at {outlier_output_filename}')
+print(f'Outliers are available at {outlier_output_filename}')
 
 #assembling cv_results dataframe
 r2_cv = cv_results['test_r2'].mean()
@@ -165,7 +202,7 @@ mae_train = cv_results['train_mae'].mean()
 score_df_train = pd.DataFrame(
     {'r2':r2_train, 'rmse':rmse_train, 'mae':mae_train}, index=['score_train'])
 
-print('Evaluating model with cleaned data')
+print('\nEvaluating model with cleaned data')
 cv_results_clean = model_selection.cross_validate(
     estimator=optimized_algorithm, X=x_train_clean, y=y_train_clean, cv=10,
     scoring=scoring, return_train_score=True)
@@ -184,7 +221,7 @@ score_df_train_clean = pd.DataFrame(
 score_df_final = pd.concat([score_df_cv, score_df_train, score_df_cv_clean, score_df_train_clean], axis=0)
 print(score_df_final)
 score_output_filename = mm.generate_unique_filename(
-    results_path, algorithm[0], 'scores')
+    results_path, name, 'scores')
 score_df_final.to_csv(score_output_filename)
 
 # trained models output removed, as it is not the point of this analysis

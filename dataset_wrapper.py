@@ -86,8 +86,6 @@ class DatasetWrapper:
         """
         try:
             full_df = pd.read_csv(file_path, index_col='index')
-            print(full_df)
-            print(full_df.columns)
         except Exception as e:
             print(e)
             print('\nUnsplit CSV file does not exist')
@@ -132,7 +130,7 @@ class DatasetWrapper:
         features = self.x_train.shape[1]
         size_train = self.y_train.shape[0]
         size_test = self.y_test.shape[0]
-        print(f'Dataset obtained from {self.file_path}\n\nDataset size: {size}\nNumber of features: {features}\nTrain subset size: {size_train}\nTest subset size: {size_test}')
+        print(f'\nDataset obtained from {self.file_path}\nDataset size: {size}\nNumber of features: {features}\nTrain subset size: {size_train}\nTest subset size: {size_test}')
 
 
     @staticmethod
