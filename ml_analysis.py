@@ -90,6 +90,15 @@ else:
 
 data.describe()
 
+try:
+    with open(config_path,'r') as file:
+        config = eval(file.read())
+        gen = config['generations']
+        pop = config['population_size']
+except:
+    gen = 30
+    pop = 30
+
 if optimize == 1:
     #dict structure: name, params
     if not os.path.exists(parameter_path):
@@ -98,14 +107,6 @@ if optimize == 1:
     with open(parameter_path,'r') as file:
         params_dict = eval(file.read())
 
-    try:
-        with open(config_path,'r') as file:
-            config = eval(file.read())
-            gen = config['generations']
-            pop = config['population_size']
-    except:
-        gen = 30
-        pop = 30
 
     if algorithm_index == 0:
         for index, (name, alg) in algorithms.items():
@@ -165,7 +166,7 @@ if optimize == 1:
 try:
     params = best_params
 except: #if above fails, ask for input
-    params = input(f'Insert the best parameters for the algorithm {name}\n')
+    params = input(f'\nInsert the parameters for the algorithm {name}\nYou might find some at analysis/(name of your dataset)/\n')
     try:
         params = dict(eval(params))
     except:
@@ -173,6 +174,34 @@ except: #if above fails, ask for input
         quit()
 
 optimized_algorithm = alg.set_params(**params)
+
+select_features = input("\nDo you want to select features? 1 or 0.\nYou don't need to select features if your dataset is already a subset of features.\n")
+select_features = mm.check_if_int(select_features)
+
+if select_features == 1:
+    feature_cv_results, sel_feats, time = mlm.genetic_feature_selection(
+        algorithm=optimized_algorithm,
+        x_train=data.x_preprocessing,
+        y_train=data.y_preprocessing,
+        scoring=scoring,
+        algorithm_name=name,
+        population_size=pop,
+        generations=gen)
+    feature_output_filename = mm.generate_unique_filename(
+        results_path, name, 'feature_selection')
+    feature_txtoutput_filename = mm.generate_unique_filename(
+        results_path, name, 'selected_features', 'time', suffix='.txt')
+    feature_cv_results.to_csv(feature_output_filename)
+    with open(feature_txtoutput_filename,'w') as file:
+        file.write(f'Selected features:\n{data.x_preprocessing.columns[sel_feats]}\n\nTime to run: {time} seconds.\n\nIn case you need to filter a dataset for columns, use:\ndataset = dataset[list of selected columns]')
+    print(f'\nFeature selection completed. Results saved to {feature_output_filename}, {feature_txtoutput_filename}')
+    feature_dataset_path = mm.generate_unique_filename(
+            datasets_path, name, 'selected_features',suffix='')
+    print(f'Saving dataset with selected features at {feature_dataset_path}')
+    data.x_train = data.x_train[data.x_train.columns[sel_feats]]
+    data.x_test = data.x_test[data.x_test.columns[sel_feats]]
+    data.x_preprocessing = data.x_preprocessing[data.x_preprocessing.columns[sel_feats]]
+    data.save(feature_dataset_path)
 
 print('\nPerforming supervised outlier removal')
 x_train_clean, y_train_clean, cv_results = mlm.supervised_outlier_removal(

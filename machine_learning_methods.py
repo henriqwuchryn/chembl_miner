@@ -1,6 +1,6 @@
 import sklearn.model_selection as model_selection
 from sklearn_genetic.callbacks import DeltaThreshold
-from sklearn_genetic import GASearchCV
+from sklearn_genetic import GASearchCV, GAFeatureSelectionCV
 from sklearn_genetic.space import Categorical, Integer, Continuous, Space
 import numpy as np
 import pandas as pd
@@ -36,32 +36,53 @@ def supervised_outlier_removal(algorithm, x_train, y_train, scoring, algorithm_n
     return x_train_clean, y_train_clean, cv_results
 
 
-def evaluate_and_optimize(algorithm, params, x_train, y_train, scoring, algorithm_name, population_size=30, generations=30):
+def evaluate_and_optimize(algorithm, param_grid, x_train, y_train, scoring, algorithm_name, population_size=30, generations=30):
     start_time = time.time()
     print(f"\nOptimizing {algorithm_name}")
-    print(f"Parameters: {describe_params(params)}")
+    print(f"Parameters: {describe_params(param_grid)}")
     param_search = GASearchCV(
         estimator=algorithm,
-        param_grid=params,
+        param_grid=param_grid,
         scoring=scoring,
         population_size=population_size,
         generations=generations,
         refit='r2',
         n_jobs=-1,
         return_train_score=True)
-    print('\nFitting\n')
+    print('\nFitting')
     callback = DeltaThreshold(threshold=0.001,generations=2)
     param_search.fit(x_train, y_train, callbacks=callback)
     search_cv_results = pd.DataFrame(param_search.cv_results_)
-    print(f'Results:\n{search_cv_results}\n')
+    print(f'\nResults:\n{search_cv_results}\n')
     best_params = param_search.best_params_
     print(f'Best parameters:\n{best_params}')
     print(f'Best score index:\n{param_search.best_index_}')
     time_to_execute = time.time()-start_time
     print(f'Time to execute: {time_to_execute} seconds')
-    search_cv_results['time_to_execute'] = time_to_execute
     return search_cv_results, best_params, time_to_execute
 
+
+def genetic_feature_selection(algorithm, x_train, y_train, scoring, algorithm_name, population_size=30, generations=30):
+    start_time = time.time()
+    print(f"\nSelecting features for {algorithm_name}")
+    feature_selection = GAFeatureSelectionCV(
+        estimator = algorithm,
+        scoring = scoring,
+        population_size=population_size,
+        generations=generations,
+        refit='r2',
+        n_jobs=-1,
+        return_train_score=True)
+    print('\nFitting')
+    callback = DeltaThreshold(threshold=0.001,generations=2)
+    feature_selection.fit(x_train, y_train, callback)
+    feature_cv_results = pd.DataFrame(feature_selection.cv_results_)
+    print(f'\nResults:\n{feature_cv_results}\n')
+    selected_features = feature_selection.support_
+    print(f'Selected features:\n{selected_features}')
+    time_to_execute = time.time()-start_time
+    print(f'Time to execute: {time_to_execute} seconds')
+    return feature_cv_results, selected_features, time_to_execute
 
 def get_model_scores(y_pred, y_test):
     r2 = metrics.r2_score(y_test, y_pred)
