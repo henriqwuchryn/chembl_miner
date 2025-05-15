@@ -196,7 +196,7 @@ if select_features == 1:
         file.write(f'Selected features:\n{data.x_preprocessing.columns[sel_feats]}\n\nTime to run: {time} seconds.\n\nIn case you need to filter a dataset for columns, use:\ndataset = dataset[list of selected columns]')
     print(f'\nFeature selection completed. Results saved to {feature_output_filename}, {feature_txtoutput_filename}')
     feature_dataset_path = mm.generate_unique_filename(
-            datasets_path, name, 'selected_features',suffix='')
+            datasets_path, name[0:8], 'feat_sel',suffix='')
     print(f'Saving dataset with selected features at {feature_dataset_path}')
     data.x_train = data.x_train[data.x_train.columns[sel_feats]]
     data.x_test = data.x_test[data.x_test.columns[sel_feats]]
@@ -216,7 +216,7 @@ outlier_target_mask = np.logical_not(data.x_train.index.isin(x_train_clean.index
 outlier_target = data.y_train[outlier_target_mask]
 outlier_df = pd.concat([outlier_general, outlier_target],axis=1)
 outlier_output_filename = mm.generate_unique_filename(
-    datasets_folder, filename[:-4], name, 'outliers')
+        datasets_folder, filename[:-4], name[0:8], 'outliers')
 outlier_df.to_csv(outlier_output_filename, index=True, index_label='index')
 print(f'Outliers are available at {outlier_output_filename}')
 
