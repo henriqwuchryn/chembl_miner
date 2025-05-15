@@ -13,9 +13,10 @@ def supervised_outlier_removal(algorithm, x_train, y_train, scoring, algorithm_n
     cv_results = model_selection.cross_validate(
             estimator=algorithm,
             X=x_train,
-            Y=y_train,
-            cv=cv,
+            y=y_train,
             scoring=scoring,
+            cv=cv,
+            n_jobs=-1,
             return_estimator=True,
             return_indices=True,
             return_train_score=True)
@@ -50,7 +51,7 @@ def evaluate_and_optimize(algorithm, param_grid, x_train, y_train, scoring, algo
         n_jobs=-1,
         return_train_score=True)
     print('\nFitting')
-    callback = DeltaThreshold(threshold=0.001,generations=2)
+    callback = DeltaThreshold(threshold=0.001,generations=3)
     param_search.fit(x_train, y_train, callbacks=callback)
     search_cv_results = pd.DataFrame(param_search.cv_results_)
     print(f'\nResults:\n{search_cv_results}\n')
@@ -74,12 +75,12 @@ def genetic_feature_selection(algorithm, x_train, y_train, scoring, algorithm_na
         n_jobs=-1,
         return_train_score=True)
     print('\nFitting')
-    callback = DeltaThreshold(threshold=0.001,generations=2)
+    callback = DeltaThreshold(threshold=0.001,generations=3)
     feature_selection.fit(x_train, y_train, callback)
     feature_cv_results = pd.DataFrame(feature_selection.cv_results_)
     print(f'\nResults:\n{feature_cv_results}\n')
     selected_features = feature_selection.support_
-    print(f'Selected features:\n{selected_features}')
+    print(f'Selected features:\n{x_train.columns[selected_features]}')
     time_to_execute = time.time()-start_time
     print(f'Time to execute: {time_to_execute} seconds')
     return feature_cv_results, selected_features, time_to_execute

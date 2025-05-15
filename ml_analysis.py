@@ -166,7 +166,7 @@ if optimize == 1:
 try:
     params = best_params
 except: #if above fails, ask for input
-    params = input(f'\nInsert the parameters for the algorithm {name}\nYou might find some at analysis/(name of your dataset)/\n')
+    params = input(f'\nInsert the parameters for the algorithm {name}:\n(You might find some at analysis/(name of your dataset)/)\n')
     try:
         params = dict(eval(params))
     except:
@@ -210,9 +210,10 @@ x_train_clean, y_train_clean, cv_results = mlm.supervised_outlier_removal(
 print('Number of samples before cleaning:', data.x_train.shape[0])
 print('Number of samples after cleaning:', x_train_clean.shape[0])
 print(f'Removed {round(((data.x_train.shape[0]-x_train_clean.shape[0])/data.x_train.shape[0]*100),2)}% of samples')
-outlier_mask = np.logical_not(data.general_data.index.isin(x_train_clean.index))
-outlier_general = data.general_data[outlier_mask]
-outlier_target = data.y_train[outlier_mask]
+outlier_gen_mask = np.logical_not(data.general_data.index.isin(x_train_clean.index))
+outlier_general = data.general_data[outlier_gen_mask]
+outlier_target_mask = np.logical_not(data.x_train.index.isin(x_train_clean.index))
+outlier_target = data.y_train[outlier_target_mask]
 outlier_df = pd.concat([outlier_general, outlier_target],axis=1)
 outlier_output_filename = mm.generate_unique_filename(
     datasets_folder, filename[:-4], name, 'outliers')
@@ -234,7 +235,7 @@ score_df_train = pd.DataFrame(
 print('\nEvaluating model with cleaned data')
 cv_results_clean = model_selection.cross_validate(
     estimator=optimized_algorithm, X=x_train_clean, y=y_train_clean, cv=10,
-    scoring=scoring, return_train_score=True)
+    scoring=scoring, n_jobs=-1, return_train_score=True)
 #assembling cv_results_clean dataframe
 r2_cv_clean = cv_results_clean['test_r2'].mean()
 rmse_cv_clean = cv_results_clean['test_rmse'].mean()
