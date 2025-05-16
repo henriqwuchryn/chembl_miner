@@ -203,23 +203,53 @@ if select_features == 1:
     data.x_preprocessing = data.x_preprocessing[data.x_preprocessing.columns[sel_feats]]
     data.save(feature_dataset_path)
 
-print('\nPerforming supervised outlier removal')
-x_train_clean, y_train_clean, cv_results = mlm.supervised_outlier_removal(
-    algorithm=optimized_algorithm, x_train=data.x_train, y_train= data.y_train,
-    scoring=scoring, algorithm_name=name)
-print('Number of samples before cleaning:', data.x_train.shape[0])
-print('Number of samples after cleaning:', x_train_clean.shape[0])
-print(f'Removed {round(((data.x_train.shape[0]-x_train_clean.shape[0])/data.x_train.shape[0]*100),2)}% of samples')
-outlier_gen_mask = np.logical_not(data.general_data.index.isin(x_train_clean.index))
-outlier_general = data.general_data[outlier_gen_mask]
-outlier_target_mask = np.logical_not(data.x_train.index.isin(x_train_clean.index))
-outlier_target = data.y_train[outlier_target_mask]
-outlier_df = pd.concat([outlier_general, outlier_target],axis=1)
-outlier_output_filename = mm.generate_unique_filename(
-        datasets_folder, filename[:-4], name[0:8], 'outliers')
-outlier_df.to_csv(outlier_output_filename, index=True, index_label='index')
-print(f'Outliers are available at {outlier_output_filename}')
+score_dfs = []
 
+outlier_detection = input("\nDo you want to detect outliers? 1 or 0.\nYou don't need to detect outliers if your dataset was already filtered.\n")
+outlier_detection = mm.check_if_int(outlier_detection)
+
+if outlier_detection == 1:
+    print('\nPerforming supervised outlier removal')
+    x_train_clean, y_train_clean, cv_results = mlm.supervised_outlier_removal(
+        algorithm=optimized_algorithm, x_train=data.x_train, y_train= data.y_train,
+        scoring=scoring, algorithm_name=name)
+    print('Number of samples before cleaning:', data.x_train.shape[0])
+    print('Number of samples after cleaning:', x_train_clean.shape[0])
+    print(f'Removed {round(((data.x_train.shape[0]-x_train_clean.shape[0])/data.x_train.shape[0]*100),2)}% of samples')
+    outlier_gen_mask = np.logical_not(data.general_data.index.isin(x_train_clean.index))
+    outlier_general = data.general_data[outlier_gen_mask]
+    outlier_target_mask = np.logical_not(data.x_train.index.isin(x_train_clean.index))
+    outlier_target = data.y_train[outlier_target_mask]
+    outlier_df = pd.concat([outlier_general, outlier_target],axis=1)
+    outlier_dataset_path = mm.generate_unique_filename(
+            datasets_path, name[0:8], 'outliers', suffix='')
+    print(f'Saving dataset without outliers at {outlier_dataset_path}')
+    data.x_train = x_train_clean
+    data.y_train = y_train_clean
+    data.save(outlier_dataset_path)
+    print(f'Outliers are available at {outlier_output_filename}')
+    
+    print('\nEvaluating model with cleaned data')
+    cv_results_clean = model_selection.cross_validate(
+        estimator=optimized_algorithm, X=x_train_clean, y=y_train_clean, cv=10,
+        scoring=scoring, n_jobs=-1, return_train_score=True)
+    #assembling cv_results_clean dataframe
+    r2_cv_clean = cv_results_clean['test_r2'].mean()
+    rmse_cv_clean = cv_results_clean['test_rmse'].mean()
+    mae_cv_clean = cv_results_clean['test_mae'].mean()
+    score_df_cv_clean = pd.DataFrame(
+        {'r2':r2_cv_clean, 'rmse':rmse_cv_clean, 'mae':mae_cv_clean}, index=['score_cv_clean'])
+    r2_train_clean = cv_results_clean['train_r2'].mean()
+    rmse_train_clean = cv_results_clean['train_rmse'].mean()
+    mae_train_clean = cv_results_clean['train_mae'].mean()
+    score_df_train_clean = pd.DataFrame(
+        {'r2':r2_train_clean, 'rmse':rmse_train_clean, 'mae':mae_train_clean}, index=['score_train_clean'])
+
+    score_dfs = score_dfs.append([score_df_cv_clean, score_df_train_clean])
+else:
+    cv_results = model_selection.cross_validate(
+        estimator=optimized_algorithm, X=data.x_train, y=data.y_train, cv=10,
+        scoring=scoring, n_jobs=-1, return_train_score=True
 #assembling cv_results dataframe
 r2_cv = cv_results['test_r2'].mean()
 rmse_cv = cv_results['test_rmse'].mean()
@@ -232,28 +262,23 @@ mae_train = cv_results['train_mae'].mean()
 score_df_train = pd.DataFrame(
     {'r2':r2_train, 'rmse':rmse_train, 'mae':mae_train}, index=['score_train'])
 
-print('\nEvaluating model with cleaned data')
-cv_results_clean = model_selection.cross_validate(
-    estimator=optimized_algorithm, X=x_train_clean, y=y_train_clean, cv=10,
-    scoring=scoring, n_jobs=-1, return_train_score=True)
-#assembling cv_results_clean dataframe
-r2_cv_clean = cv_results_clean['test_r2'].mean()
-rmse_cv_clean = cv_results_clean['test_rmse'].mean()
-mae_cv_clean = cv_results_clean['test_mae'].mean()
-score_df_cv_clean = pd.DataFrame(
-    {'r2':r2_cv_clean, 'rmse':rmse_cv_clean, 'mae':mae_cv_clean}, index=['score_cv_clean'])
-r2_train_clean = cv_results_clean['train_r2'].mean()
-rmse_train_clean = cv_results_clean['train_rmse'].mean()
-mae_train_clean = cv_results_clean['train_mae'].mean()
-score_df_train_clean = pd.DataFrame(
-    {'r2':r2_train_clean, 'rmse':rmse_train_clean, 'mae':mae_train_clean}, index=['score_train_clean'])
-
-score_df_final = pd.concat([score_df_cv, score_df_train, score_df_cv_clean, score_df_train_clean], axis=0)
+score_dfs = score_dfs.append([score_df_cv, score_df_train])
+score_df_final = pd.concat(score_dfs, axis=0)
 print(score_df_final)
 score_output_filename = mm.generate_unique_filename(
     results_path, name, 'scores')
 score_df_final.to_csv(score_output_filename)
+print(f'\nResults are available at {score_output_filename}')
 
+print('\nFitting model with training data')
+model = optimized_algorithm.fit(X=data.x_train, y=data.y_train)
+print('Fitting completed')
+model_output_filename = mm.generate_unique_filename(
+    results_path, name, 'model', suffix='.pkl')
+print(f'Saving fitted model to {model_output_filename}')
+with open(model_output_filename, 'wb') as file:
+    pickle.dump(model, file)
+print('\nExiting')
 # trained models output removed, as it is not the point of this analysis
 
 # model_output_filename = mm.generate_unique_filename(
@@ -263,4 +288,3 @@ score_df_final.to_csv(score_output_filename)
 #     results_path, algorithm[0], 'ModelClean',suffix='.pkl')
 # joblib.dump(model_clean, model_clean_output_filename)
 
-print(f'\nResults are available at {score_output_filename}')
