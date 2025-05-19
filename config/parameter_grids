@@ -47,9 +47,9 @@
             'reg_lambda': Continuous(lower=0.1, upper=2.0)  # L2 regularization
         },
         'HistGradientBoostingRegressor': {
-            'loss': Categorical(choices=['squared_error','absolute_error','gamma','quantile']), #squared_error
+            'loss': Categorical(choices=['squared_error','absolute_error']), #squared_error
             'max_iter': Integer(lower=100, upper=2000), #100
-            'learning_rate': Continuous(lower=0.1, upper=1), #0.1
+            'learning_rate': Continuous(lower=0.001, upper=1),
             'max_depth': Categorical(choices=[None]), #None
             'min_samples_leaf': Integer(lower=10, upper=200), #20
             'max_leaf_nodes': Integer(lower=10, upper=200),  #61

@@ -1,4 +1,5 @@
 import os
+import pickle
 import sys
 import time
 import re
@@ -119,7 +120,7 @@ if optimize == 1:
 
             search_cv_results, best_params, time = mlm.evaluate_and_optimize(
                 algorithm=alg,
-                params=params,
+                param_grid=params,
                 x_train=data.x_preprocessing,
                 y_train=data.y_preprocessing,
                 scoring=scoring,
@@ -147,7 +148,7 @@ if optimize == 1:
             quit()
         search_cv_results, best_params, time = mlm.evaluate_and_optimize(
             algorithm=alg,
-            params=params,
+            param_grid=params,
             x_train=data.x_preprocessing,
             y_train=data.y_preprocessing,
             scoring=scoring,
@@ -227,7 +228,7 @@ if outlier_detection == 1:
     data.x_train = x_train_clean
     data.y_train = y_train_clean
     data.save(outlier_dataset_path)
-    print(f'Outliers are available at {outlier_output_filename}')
+    print(f'Outliers are available at {outlier_dataset_path}')
     
     print('\nEvaluating model with cleaned data')
     cv_results_clean = model_selection.cross_validate(
@@ -245,11 +246,12 @@ if outlier_detection == 1:
     score_df_train_clean = pd.DataFrame(
         {'r2':r2_train_clean, 'rmse':rmse_train_clean, 'mae':mae_train_clean}, index=['score_train_clean'])
 
-    score_dfs = score_dfs.append([score_df_cv_clean, score_df_train_clean])
+    score_dfs.extend([score_df_cv_clean, score_df_train_clean])
 else:
+    print('\nEvaluating model')
     cv_results = model_selection.cross_validate(
         estimator=optimized_algorithm, X=data.x_train, y=data.y_train, cv=10,
-        scoring=scoring, n_jobs=-1, return_train_score=True
+        scoring=scoring, n_jobs=-1, return_train_score=True)
 #assembling cv_results dataframe
 r2_cv = cv_results['test_r2'].mean()
 rmse_cv = cv_results['test_rmse'].mean()
@@ -262,7 +264,7 @@ mae_train = cv_results['train_mae'].mean()
 score_df_train = pd.DataFrame(
     {'r2':r2_train, 'rmse':rmse_train, 'mae':mae_train}, index=['score_train'])
 
-score_dfs = score_dfs.append([score_df_cv, score_df_train])
+score_dfs.extend([score_df_cv, score_df_train])
 score_df_final = pd.concat(score_dfs, axis=0)
 print(score_df_final)
 score_output_filename = mm.generate_unique_filename(
@@ -278,6 +280,22 @@ model_output_filename = mm.generate_unique_filename(
 print(f'Saving fitted model to {model_output_filename}')
 with open(model_output_filename, 'wb') as file:
     pickle.dump(model, file)
+print('Model saved')
+test_model = input('\nDo you want to test the model? 1 or 0.\n')
+test_model = mm.check_if_int(test_model)
+if test_model == 1:
+    print('\nEvaluating model with test data.\n\nAttention!\n\nDo not use these results to optimize your model, lest you should leak information from the test data into the model.')
+    y_pred_test = model.predict(data.x_test)
+    r2_test = metrics.r2_score(data.y_test, y_pred_test)
+    rmse_test = metrics.root_mean_squared_error(data.y_test, y_pred_test)
+    mae_test = metrics.mean_absolute_error(data.y_test, y_pred_test)
+    score_df_test = pd.DataFrame(
+        {'r2':r2_test, 'rmse':rmse_test, 'mae':mae_test}, index=['score_test'])
+    test_output_filename = mm.generate_unique_filename(
+            results_path, name, 'test')
+    score_df_test.to_csv(test_output_filename)
+    print(f'\nTest results are available at {test_output_filename}')
+    
 print('\nExiting')
 # trained models output removed, as it is not the point of this analysis
 
