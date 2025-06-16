@@ -130,7 +130,7 @@ class DatasetWrapper:
         features = self.x_train.shape[1]
         size_train = self.y_train.shape[0]
         size_test = self.y_test.shape[0]
-        size_preprocessing = self.y_preprocessing[0]
+        size_preprocessing = self.y_preprocessing.shape[0]
         print(f'\nDataset obtained from {self.file_path}\nDataset size: {size}\nNumber of features: {features}\nTrain subset size: {size_train}\nTest subset size: {size_test}')
         if size_preprocessing != size_train:
             print('This dataset contains a preprocessing subset of 7500 samples for hyperparameter optimization and feature selection')
