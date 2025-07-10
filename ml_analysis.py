@@ -20,18 +20,20 @@ random_state = 42
 
 try:
     filename = sys.argv[1]
+    if filename[-4:] == '.csv':
+        filename = filename[:-4]
 except:
     print(
         '''\nyou must insert the dataset filename as an argument, like this:
->python ml_analysis.py FILENAME.csv'''
+>python ml_analysis.py FILENAME'''
     )
     quit()
 
-results_path = f'analysis/{filename[:-4]}'
+results_path = f'analysis/{filename}'
 if not os.path.exists(results_path):
     os.makedirs(results_path)
 datasets_folder = 'datasets'
-datasets_path = f'{datasets_folder}/{filename[:-4]}'
+datasets_path = f'{datasets_folder}/{filename}'
 parameter_path = 'config/parameter_grids'
 config_path = 'config/config'
 
@@ -82,7 +84,7 @@ scoring = { #defining scoring metrics for optimization
 
 if not os.path.exists(f'{datasets_path}/gd.csv'):
     data = DatasetWrapper().load_raw_dataset(
-            f'{datasets_folder}/{filename}',
+            f'{datasets_folder}/{filename}.csv',
             general_columns,
             target_column)
     data.save(datasets_path)
