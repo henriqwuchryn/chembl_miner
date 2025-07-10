@@ -76,10 +76,11 @@ else:
         quit()
 
 scoring = { #defining scoring metrics for optimization
-    'r2': metrics.make_scorer(metrics.r2_score),
-    'rmse': metrics.make_scorer(
-        lambda y_true, y_pred: metrics.root_mean_squared_error(y_true, y_pred)),
-    'mae': metrics.make_scorer(metrics.mean_absolute_error)
+#    'r2': metrics.make_scorer(metrics.r2_score),
+#    'rmse': metrics.make_scorer(
+#        lambda y_true, y_pred: metrics.root_mean_squared_error(y_true, y_pred)),
+#    'mae': metrics.make_scorer(metrics.mean_absolute_error),
+    'quantile': metrics.make_scorer(metrics.mean_pinball_loss(alpha=0.9),
 }
 
 if not os.path.exists(f'{datasets_path}/gd.csv'):
