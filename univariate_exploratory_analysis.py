@@ -92,6 +92,12 @@ plt.ylabel('Frequency', fontsize=14, fontweight='bold')
 plt.savefig(f'{results_path}/freq_bioactivity.svg')
 
 plt.figure(figsize=(5.5, 5.5))
+sns.boxplot(x = 'neg_log_value',
+            data = activity_df)
+plt.xlabel('Negative Log Value', fontsize=14, fontweight='bold')
+plt.savefig(f'{results_path}/neg_log_value_boxplot.svg')
+
+plt.figure(figsize=(5.5, 5.5))
 sns.boxplot(x = 'bioactivity_class',
             y = 'MW',
             data = activity_df,
