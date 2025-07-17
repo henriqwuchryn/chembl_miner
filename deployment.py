@@ -95,7 +95,7 @@ if model_index >= 0:
     fingerprint_aligned = fingerprint[fingerprint.columns[feature_mask]]
     y_pred = model.predict(fingerprint_aligned)
     match = re.search(re_pattern,model_path)
-    y_pred = pd.Series(y_pred, name=f'pIC50_{match.group(2)}_{match.group(3)[:8]}')
+    y_pred = pd.Series(y_pred, name=f'pIC50_{match.group(2)}_{match.group(3)}')
     molecules_df = pd.concat([molecules_df, y_pred], axis=1)
     output_filename = mm.generate_unique_filename(
             results_path, 'deployment', match.group(2), match.group(3)[:8])
@@ -112,7 +112,7 @@ if model_index < 0:
         fingerprint_aligned = fingerprint[fingerprint.columns[feature_mask]]
         y_pred = model.predict(fingerprint_aligned)
         match = re.search(re_pattern,model_path)
-        y_pred = pd.Series(y_pred, name=f'pIC50_{match.group(2)}_{match.group(3)[:8]}')
+        y_pred = pd.Series(y_pred, name=f'pIC50_{match.group(2)}_{match.group(3)}')
         molecules_df = pd.concat([molecules_df, y_pred], axis=1)
         output_filename = mm.generate_unique_filename(
            results_path, 'deployment', f'{len(model_files)}models')
