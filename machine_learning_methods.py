@@ -37,7 +37,7 @@ def supervised_outlier_removal(algorithm, x_train, y_train, scoring, algorithm_n
     return x_train_clean, y_train_clean, cv_results
 
 
-def evaluate_and_optimize(algorithm, param_grid, x_train, y_train, scoring, algorithm_name, population_size=30, generations=30):
+def evaluate_and_optimize(algorithm, param_grid, x_train, y_train, scoring, algorithm_name, population_size=30, generations=30, refit='r2'):
     start_time = time.time()
     print(f"\nOptimizing {algorithm_name}")
     print(f"Parameters: {describe_params(param_grid)}")
@@ -47,7 +47,7 @@ def evaluate_and_optimize(algorithm, param_grid, x_train, y_train, scoring, algo
         scoring=scoring,
         population_size=population_size,
         generations=generations,
-        refit='r2',
+        refit=refit,
         n_jobs=-1,
         return_train_score=True)
     print('\nFitting')
@@ -63,7 +63,7 @@ def evaluate_and_optimize(algorithm, param_grid, x_train, y_train, scoring, algo
     return search_cv_results, best_params, time_to_execute
 
 
-def genetic_feature_selection(algorithm, x_train, y_train, scoring, algorithm_name, population_size=30, generations=30):
+def genetic_feature_selection(algorithm, x_train, y_train, scoring, algorithm_name, population_size=30, generations=30, refit='r2'):
     start_time = time.time()
     print(f"\nSelecting features for {algorithm_name}")
     feature_selection = GAFeatureSelectionCV(
@@ -71,7 +71,7 @@ def genetic_feature_selection(algorithm, x_train, y_train, scoring, algorithm_na
         scoring = scoring,
         population_size=population_size,
         generations=generations,
-        refit='r2',
+        refit=refit,
         n_jobs=-1,
         return_train_score=True)
     print('\nFitting')

@@ -80,7 +80,8 @@ scoring = { #defining scoring metrics for optimization
 #    'rmse': metrics.make_scorer(
 #        lambda y_true, y_pred: metrics.root_mean_squared_error(y_true, y_pred)),
 #    'mae': metrics.make_scorer(metrics.mean_absolute_error),
-    'quantile': metrics.make_scorer(metrics.mean_pinball_loss(alpha=0.9),
+    'quantile': metrics.make_scorer(
+        lambda y_true, y_pred: metrics.mean_pinball_loss(y_true, y_pred, alpha=0.9)),
 }
 
 if not os.path.exists(f'{datasets_path}/gd.csv'):
@@ -129,7 +130,8 @@ if optimize == 1:
                 scoring=scoring,
                 algorithm_name=name,
                 generations=gen,
-                population_size=pop)
+                population_size=pop,
+                refit='quantile')
             search_output_filename = mm.generate_unique_filename(
                 results_path, name, 'paramsearch')
             search_txtoutput_filename = mm.generate_unique_filename(
@@ -157,7 +159,8 @@ if optimize == 1:
             scoring=scoring,
             algorithm_name=name,
             generations=gen,
-            population_size=pop)
+            population_size=pop,
+            refit='quantile')
         search_output_filename = mm.generate_unique_filename(
             results_path, name, 'paramsearch')
         search_txtoutput_filename = mm.generate_unique_filename(
@@ -211,6 +214,39 @@ score_dfs = []
 
 outlier_detection = input("\nDo you want to detect outliers? 1 or 0.\nYou don't need to detect outliers if your dataset was already filtered.\n")
 outlier_detection = mm.check_if_int(outlier_detection)
+
+def get_results (cv_results, name: str = ''):
+    try:
+        r2_test_mean = cv_results['test_r2'].mean()
+        r2_test_std = cv.results['test_r2'].std()
+        r2_train_mean = cv_results['train_r2'].mean()
+        r2_train_std = cv.results['train_r2'].std()
+    except KeyError as e: 
+        print('Not available: r2')
+    
+    try:
+        rmse_test_mean = cv_results['test_rmse'].mean()
+        rmse_test_std = cv.results['test_rmse'].std()
+        rmse_train_mean = cv_results['train_rmse'].mean()
+        rmse_train_std = cv.results['train_rmse'].std()
+    except KeyError as e: 
+        print('Not available: rmse')
+    
+    try:
+        mae_test_mean = cv_results['test_mae'].mean()
+        mae_test_std = cv.results['test_mae'].std()
+        mae_train_mean = cv_results['train_mae'].mean()
+        mae_train_std = cv.results['train_mae'].std()
+    except KeyError as e: 
+        print('Not available: mae')
+
+# DATA FRAME 4 COLUNAS UMA LINHA (TIPO DO SCORE) 4 COLUNAS (TIPO DO VALOR, TRAIN, TEST, MEAN OU STD)
+# CONCATENAR TUDO
+
+
+        score_df_train_clean = pd.DataFrame(
+            {'r2':r2_train_clean, 'rmse':rmse_train_clean, 'mae':mae_train_clean}, index=['score_train_clean'])
+
 
 if outlier_detection == 1:
     print('\nPerforming supervised outlier removal')
