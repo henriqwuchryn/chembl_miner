@@ -109,3 +109,61 @@ def describe_params(params):
         param_string = param_string + '\n' + line
     return param_string
 
+
+def get_results (cv_results, name = ''):
+    score_dfs = []
+    if name != '':
+        name = f'_{name}'
+    try:
+        r2_test_mean = cv_results['test_r2'].mean()
+        r2_test_std = cv_results['test_r2'].std()
+        r2_train_mean = cv_results['train_r2'].mean()
+        r2_train_std = cv_results['train_r2'].std()
+        r2_df = pd.DataFrame({
+            'test_mean': r2_test_mean, 'test_std': r2_test_std,
+            'train_mean': r2_train_mean, 'train_std': r2_train_std},
+            index=[f"r2{name}"])
+        score_dfs.extend(r2_df)
+    except KeyError as e: 
+        print('Not available: r2')
+    
+    try:
+        rmse_test_mean = cv_results['test_rmse'].mean()
+        rmse_test_std = cv_results['test_rmse'].std()
+        rmse_train_mean = cv_results['train_rmse'].mean()
+        rmse_train_std = cv_results['train_rmse'].std()
+        rmse_df = pd.DataFrame({
+            'test_mean': rmse_test_mean, 'test_std': rmse_test_std,
+            'train_mean': rmse_train_mean, 'train_std': rmse_train_std},
+            index=[f'rmse{name}'])
+        score_dfs.extend(rmse_df)
+    except KeyError as e: 
+        print('Not available: rmse')
+    
+    try:
+        mae_test_mean = cv_results['test_mae'].mean()
+        mae_test_std = cv_results['test_mae'].std()
+        mae_train_mean = cv_results['train_mae'].mean()
+        mae_train_std = cv_results['train_mae'].std()
+        mae_df = pd.DataFrame({
+            'test_mean': mae_test_mean, 'test_std': mae_test_std,
+            'train_mean': mae_train_mean, 'train_std': mae_train_std},
+
+            index=[f'mae{name}'])
+        score_dfs.extend(mae_df)
+    except KeyError as e: 
+        print('Not available: mae')
+    
+    try:
+        quantile_test_mean = cv_results['test_quantile'].mean()
+        quantile_test_std = cv_results['test_quantile'].std()
+        quantile_train_mean = cv_results['train_quantile'].mean()
+        quantile_train_std = cv_results['train_quantile'].std()
+        quantile_df = pd.DataFrame({
+            'test_mean': quantile_test_mean, 'test_std': quantile_test_std,
+            'train_mean': quantile_train_mean, 'train_std': quantile_train_std},
+            index=[f'quantile{name}'])
+        score_dfs.extend(quantile_df)
+    except KeyError as e: 
+        print('Not available: quantile')
+    return score_dfs

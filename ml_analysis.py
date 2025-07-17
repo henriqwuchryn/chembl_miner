@@ -215,38 +215,6 @@ score_dfs = []
 outlier_detection = input("\nDo you want to detect outliers? 1 or 0.\nYou don't need to detect outliers if your dataset was already filtered.\n")
 outlier_detection = mm.check_if_int(outlier_detection)
 
-def get_results (cv_results, name: str = ''):
-    try:
-        r2_test_mean = cv_results['test_r2'].mean()
-        r2_test_std = cv.results['test_r2'].std()
-        r2_train_mean = cv_results['train_r2'].mean()
-        r2_train_std = cv.results['train_r2'].std()
-    except KeyError as e: 
-        print('Not available: r2')
-    
-    try:
-        rmse_test_mean = cv_results['test_rmse'].mean()
-        rmse_test_std = cv.results['test_rmse'].std()
-        rmse_train_mean = cv_results['train_rmse'].mean()
-        rmse_train_std = cv.results['train_rmse'].std()
-    except KeyError as e: 
-        print('Not available: rmse')
-    
-    try:
-        mae_test_mean = cv_results['test_mae'].mean()
-        mae_test_std = cv.results['test_mae'].std()
-        mae_train_mean = cv_results['train_mae'].mean()
-        mae_train_std = cv.results['train_mae'].std()
-    except KeyError as e: 
-        print('Not available: mae')
-
-# DATA FRAME 4 COLUNAS UMA LINHA (TIPO DO SCORE) 4 COLUNAS (TIPO DO VALOR, TRAIN, TEST, MEAN OU STD)
-# CONCATENAR TUDO
-
-
-        score_df_train_clean = pd.DataFrame(
-            {'r2':r2_train_clean, 'rmse':rmse_train_clean, 'mae':mae_train_clean}, index=['score_train_clean'])
-
 
 if outlier_detection == 1:
     print('\nPerforming supervised outlier removal')
@@ -274,36 +242,17 @@ if outlier_detection == 1:
         estimator=optimized_algorithm, X=x_train_clean, y=y_train_clean, cv=10,
         scoring=scoring, n_jobs=-1, return_train_score=True)
     #assembling cv_results_clean dataframe
-    r2_cv_clean = cv_results_clean['test_r2'].mean()
-    rmse_cv_clean = cv_results_clean['test_rmse'].mean()
-    mae_cv_clean = cv_results_clean['test_mae'].mean()
-    score_df_cv_clean = pd.DataFrame(
-        {'r2':r2_cv_clean, 'rmse':rmse_cv_clean, 'mae':mae_cv_clean}, index=['score_cv_clean'])
-    r2_train_clean = cv_results_clean['train_r2'].mean()
-    rmse_train_clean = cv_results_clean['train_rmse'].mean()
-    mae_train_clean = cv_results_clean['train_mae'].mean()
-    score_df_train_clean = pd.DataFrame(
-        {'r2':r2_train_clean, 'rmse':rmse_train_clean, 'mae':mae_train_clean}, index=['score_train_clean'])
+    cv_score_clean = mlm.get_results(cv_results_clean,'clean')
+    score_dfs.extend(cv_score_clean)
 
-    score_dfs.extend([score_df_cv_clean, score_df_train_clean])
 else:
     print('\nEvaluating model')
     cv_results = model_selection.cross_validate(
         estimator=optimized_algorithm, X=data.x_train, y=data.y_train, cv=10,
         scoring=scoring, n_jobs=-1, return_train_score=True)
 #assembling cv_results dataframe
-r2_cv = cv_results['test_r2'].mean()
-rmse_cv = cv_results['test_rmse'].mean()
-mae_cv = cv_results['test_mae'].mean()
-score_df_cv = pd.DataFrame(
-    {'r2':r2_cv, 'rmse':rmse_cv, 'mae':mae_cv}, index=['score_cv'])
-r2_train = cv_results['train_r2'].mean()
-rmse_train = cv_results['train_rmse'].mean()
-mae_train = cv_results['train_mae'].mean()
-score_df_train = pd.DataFrame(
-    {'r2':r2_train, 'rmse':rmse_train, 'mae':mae_train}, index=['score_train'])
-
-score_dfs.extend([score_df_cv, score_df_train])
+cv_score = mlm.get_results(cv_results)
+score_dfs.extend(cv_score)
 score_df_final = pd.concat(score_dfs, axis=0)
 print(score_df_final)
 score_output_filename = mm.generate_unique_filename(
