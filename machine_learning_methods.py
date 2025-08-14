@@ -37,7 +37,7 @@ def supervised_outlier_removal(algorithm, x_train, y_train, scoring, algorithm_n
     return x_train_clean, y_train_clean, cv_results
 
 
-def evaluate_and_optimize(algorithm, param_grid, x_train, y_train, scoring, algorithm_name, population_size=30, generations=30, refit='r2'):
+def evaluate_and_optimize(algorithm, param_grid, x_train, y_train, scoring, algorithm_name, criteria='max', population_size=30, generations=30, refit='r2'):
     start_time = time.time()
     print(f"\nOptimizing {algorithm_name}")
     print(f"Parameters: {describe_params(param_grid)}")
@@ -45,6 +45,7 @@ def evaluate_and_optimize(algorithm, param_grid, x_train, y_train, scoring, algo
         estimator=algorithm,
         param_grid=param_grid,
         scoring=scoring,
+        criteria=criteria,
         population_size=population_size,
         generations=generations,
         refit=refit,
