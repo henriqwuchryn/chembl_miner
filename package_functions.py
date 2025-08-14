@@ -82,7 +82,7 @@ class DatasetWrapper:
             print("Dataset loading failed")
 
     def load_unsplit_dataframe(
-        self, full_df, target_column='neg_log_value', test_size=0.2, random_state=42
+        self, full_df, target_column, holdout_size, random_state, preprocessing_size
     ):
         """
         Loads an unsplit dataframe containing all columns and splits it into
@@ -92,7 +92,7 @@ class DatasetWrapper:
             dataframe (pandas.DataFrame): Unsplit dataframe containing the dataset.
             general_columns (list): List of columns representing general data.
             target_column (str): Column name representing the target variable.
-            test_size (float): Proportion of the dataset to include in the test split. Standard value = 0.2.
+            holdout_size (float): Proportion of the dataset to include in the test split. Standard value = 0.2.
             random_state (int): Random state for reproducibility. Standard value = 42.
         """
         general_columns = [
@@ -111,26 +111,30 @@ class DatasetWrapper:
         features = full_df.drop(columns=general_columns)
         target = full_df[target_column]
         self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(
-            features, target, test_size=test_size, random_state=random_state
+            features, target, holdout_size=holdout_size, random_state=random_state
         )
         self.file_path = file_path
         print(f"Unsplit dataset loaded and split into train/test sets")
         # Create preprocessing dataset
-        self.create_preprocessing_dataset()
+        self.create_preprocessing_dataset(
+            random_state=random_state, preprocessing_size=preprocessing_size
+        )
 
-    def create_preprocessing_dataset(self, max_samples=7500):
+    def create_preprocessing_dataset(self, random_state, preprocessing_size=7500):
         """
         Creates a preprocessing dataset by sampling from the train dataset.
-        If the train dataset is larger than 10,000 samples, it samples 7,500 examples.
+        If the train dataset is larger max_samples, it samples this amount of samples (default: 7500).
         Otherwise, it uses the entire train dataset.
 
         Args:
             max_samples (int): Number of samples to use for preprocessing if the train dataset is large.
         """
-        if len(self.x_train) > 10000:
-            self.x_preprocessing = self.x_train.sample(n=max_samples, random_state=42)
+        if len(self.x_train) > preprocessing_size:
+            self.x_preprocessing = self.x_train.sample(
+                n=preprocessing_size, random_state=random_state
+            )
             self.y_preprocessing = self.y_train.loc[self.x_preprocessing.index]
-            print(f"Preprocessing dataset created with {max_samples} samples.")
+            print(f"Preprocessing dataset created with {preprocessing_size} samples.")
         else:
             self.x_preprocessing = self.x_train
             self.y_preprocessing = self.y_train
@@ -158,17 +162,17 @@ class DatasetWrapper:
 
     @staticmethod
     def load_unsplit_dataset(
-        full_df, target_column, test_size=0.2, random_state=42
+        full_df, target_column, holdout_size, random_state, preprocessing_size
     ):
         instance = DatasetWrapper()
         instance.load_unsplit_dataframe(
-            full_df, target_column, test_size=0.2, random_state=42
+            full_df, target_column, holdout_size, random_state, preprocessing_size
         )
         return instance
 
 
 def get_activity_data(
-    target_chembl_id: str, activity_type: str, convert_units: int = 1, target_column='neg_log_value'
+    target_chembl_id: str, activity_type: str, convert_units: bool = True
 ) -> pd.DataFrame:
     """
     Fetches and processes activity data from the ChEMBL database for a given target ID and activity type.
@@ -177,7 +181,7 @@ def get_activity_data(
         activity_type (str): The type of activity to filter results by.
         convert_units (int): Whether to convert units to mol/L (1 for yes, 0 for no).
     Returns:
-        dataset (DatasetWrapper): A DatasetWrapper object containing the processed dataset.
+        dataset (pd.DataFrame): A dataframe object containing the processed dataset.
     """
     activity = new_client.activity
     activity_query = activity.filter(target_chembl_id=target_chembl_id)
@@ -201,7 +205,7 @@ def get_activity_data(
     )
     activity_df = mmm.getLipinskiDescriptors(activity_df)
     activity_df = mmm.getRo5Violations(activity_df)
-    if convert_units == 1:
+    if convert_units:
         activity_df = mmm.convert_to_M(activity_df)
     activity_df = mm.normalizeValue(activity_df)
     activity_df = mm.getNegLog(activity_df)
@@ -216,6 +220,62 @@ def get_activity_data(
             bioactivity_class.append("intermediate")
 
     activity_df["bioactivity_class"] = bioactivity_class
-    dataset = DatasetWrapper.load_unsplit_dataset(activity_df, target_column)
+    return activity_df
+
+
+def calculate_fingerprint(
+    activity_df: pd.DataFrame,
+    fingerprint: str | list[str] = "pubchem",
+) -> pd.DataFrame:
+
+    fingerprint_dict = {
+        "atompairs2d": "fingerprint/AtomPairs2DFingerprinter.xml",
+        "atompairs2dcount": "fingerprint/AtomPairs2DFingerprintCount.xml",
+        "estate": "fingerprint/EStateFingerprinter.xml",
+        "extended": "fingerprint/ExtendedFingerprinter.xml",
+        "fingerprinter": "fingerprint/Fingerprinter.xml",
+        "graphonly": "fingerprint/GraphOnlyFingerprinter.xml",
+        "klekota": "fingerprint/KlekotaRothFingerprinter.xml",
+        "klekotacount": "fingerprint/KlekotaRothFingerprintCount.xml",
+        "maccs": "fingerprint/MACCSFingerprinter.xml",
+        "pubchem": "fingerprint/PubchemFingerprinter.xml",
+        "substructure": "fingerprint/SubstructureFingerprinter.xml",
+        "substructurecount": "fingerprint/SubstructureFingerprintCount.xml",
+    }
+
+    if type(fingerprint) == str:
+        fingerprint = [fingerprint]
+
+    descriptors_df = pd.DataFrame(index=activity_df.index)
+
+    for i in fingerprint:
+        fingerprint_path = fingerprint_dict[fingerprint]
+        mmm.calculate_fingerprint(activity_df, fingerprint_path)
+        descriptors_df_i = pd.read_csv("descriptors.csv")
+        descriptors_df_i = descriptors_df_i.drop("Name", axis=1)
+        descriptors_df_i = pd.DataFrame(descriptors_df_i, index=activity_df.index)
+        descriptors_df = pd.concat([descriptors_df, descriptors_df_i], axis=1)
+        os.remove("descriptors.csv")
+        os.remove("descriptors.csv.log")
+    descriptors_df = mlm.scale_features(descriptors_df, preproc.MinMaxScaler())
+    descriptors_df = mm.remove_low_variance_columns(descriptors_df, 0)
+
+    return descriptors_df
+
+
+def assemble_dataset(
+    activity_df,
+    descriptors_df,
+    target_column="neg_log_value",
+    holdout_size=0.2,
+    random_state=42,
+    preprocessing_size=7500,
+) -> DatasetWrapper:
+    dataset_df = pd.concat([activity_df, descriptors_df], axis=1)
+    dataset_df.replace([np.inf, -np.inf], np.nan, inplace=True)
+    dataset_df.dropna(inplace=True)
+    dataset = DatasetWrapper.load_unsplit_dataset(
+        dataset_df, target_column, holdout_size, random_state, preprocessing_size
+    )
+
     return dataset
-    # ADD IMPLEMENTATION TO DATASET WRAPPER
