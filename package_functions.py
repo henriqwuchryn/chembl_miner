@@ -2,6 +2,7 @@ import pandas as pd
 import pickle
 from sklearn.model_selection import train_test_split
 from chembl_webresource_client.new_client import new_client
+import machine_learning_methods as mlm
 import molecules_manipulation_methods as mmm
 import miscelanneous_methods as mm
 
@@ -82,7 +83,13 @@ class DatasetWrapper:
             print("Dataset loading failed")
 
     def load_unsplit_dataframe(
-        self, full_df, target_column, holdout_size, random_state, preprocessing_size
+        self,
+        full_df,
+        target_column,
+        nonfeature_columns,
+        holdout_size,
+        random_state,
+        preprocessing_size,
     ):
         """
         Loads an unsplit dataframe containing all columns and splits it into
@@ -95,20 +102,8 @@ class DatasetWrapper:
             holdout_size (float): Proportion of the dataset to include in the test split. Standard value = 0.2.
             random_state (int): Random state for reproducibility. Standard value = 42.
         """
-        general_columns = [
-            "canonical_smiles",
-            "molecule_chembl_id",
-            "standard_type",
-            "standard_value",
-            "standard_units",
-            "assay_description",
-            "neg_log_value",
-            "lipinski_descriptors",
-            "ro5_violations",
-            "bioactivity_class",
-        ]
-        self.general_data = full_df[general_columns]
-        features = full_df.drop(columns=general_columns)
+        self.general_data = full_df[nonfeature_columns]
+        features = full_df.drop(columns=nonfeature_columns)
         target = full_df[target_column]
         self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(
             features, target, holdout_size=holdout_size, random_state=random_state
@@ -157,16 +152,26 @@ class DatasetWrapper:
     @staticmethod
     def load_dataset(file_path):
         instance = DatasetWrapper()
-        instance.load(file_path)
+        instance.load(file_path=file_path)
         return instance
 
     @staticmethod
     def load_unsplit_dataset(
-        full_df, target_column, holdout_size, random_state, preprocessing_size
+        full_df,
+        target_column,
+        nonfeature_columns,
+        holdout_size,
+        random_state,
+        preprocessing_size,
     ):
         instance = DatasetWrapper()
         instance.load_unsplit_dataframe(
-            full_df, target_column, holdout_size, random_state, preprocessing_size
+            full_df=full_df,
+            target_column=target_column,
+            nonfeature_columns=nonfeature_columns,
+            holdout_size=holdout_size,
+            random_state=random_state,
+            preprocessing_size=preprocessing_size,
         )
         return instance
 
@@ -186,7 +191,7 @@ def get_activity_data(
     activity = new_client.activity
     activity_query = activity.filter(target_chembl_id=target_chembl_id)
     activity_query = activity_query.filter(standard_type=activity_type)
-    activity_df: pd.DataFrame = pd.DataFrame(activity_query)
+    activity_df: pd.DataFrame = pd.DataFrame(data=activity_query)
     columns = [
         "canonical_smiles",
         "molecule_chembl_id",
@@ -197,18 +202,18 @@ def get_activity_data(
     ]
     activity_df = activity_df[columns]
     activity_df["standard_value"] = pd.to_numeric(
-        activity_df["standard_value"], errors="coerce"
+        arg=activity_df["standard_value"], errors="coerce"
     )
     activity_df = activity_df[activity_df["standard_value"] > 0]
     activity_df = (
         activity_df.dropna().drop_duplicates("canonical_smiles").reset_index(drop=True)
     )
-    activity_df = mmm.getLipinskiDescriptors(activity_df)
-    activity_df = mmm.getRo5Violations(activity_df)
+    activity_df = mmm.getLipinskiDescriptors(molecules_df=activity_df)
+    activity_df = mmm.getRo5Violations(molecules_df=activity_df)
     if convert_units:
-        activity_df = mmm.convert_to_M(activity_df)
-    activity_df = mm.normalizeValue(activity_df)
-    activity_df = mm.getNegLog(activity_df)
+        activity_df = mmm.convert_to_M(molecules_df=activity_df)
+    activity_df = mm.normalizeValue(molecules_df=activity_df)
+    activity_df = mm.getNegLog(molecules_df=activity_df)
     bioactivity_class = []
 
     for i in activity_df.standard_value:
@@ -250,15 +255,19 @@ def calculate_fingerprint(
 
     for i in fingerprint:
         fingerprint_path = fingerprint_dict[fingerprint]
-        mmm.calculate_fingerprint(activity_df, fingerprint_path)
+        mmm.calculate_fingerprint(dataframe=activity_df, fingerprint=fingerprint_path)
         descriptors_df_i = pd.read_csv("descriptors.csv")
         descriptors_df_i = descriptors_df_i.drop("Name", axis=1)
-        descriptors_df_i = pd.DataFrame(descriptors_df_i, index=activity_df.index)
-        descriptors_df = pd.concat([descriptors_df, descriptors_df_i], axis=1)
+        descriptors_df_i = pd.DataFrame(data=descriptors_df_i, index=activity_df.index)
+        descriptors_df = pd.concat(objs=[descriptors_df, descriptors_df_i], axis=1)
         os.remove("descriptors.csv")
         os.remove("descriptors.csv.log")
-    descriptors_df = mlm.scale_features(descriptors_df, preproc.MinMaxScaler())
-    descriptors_df = mm.remove_low_variance_columns(descriptors_df, 0)
+    descriptors_df = mlm.scale_features(
+        features=descriptors_df, scaler=preproc.MinMaxScaler()
+    )
+    descriptors_df = mm.remove_low_variance_columns(
+        input_data=descriptors_df, threshold=0
+    )
 
     return descriptors_df
 
@@ -271,11 +280,59 @@ def assemble_dataset(
     random_state=42,
     preprocessing_size=7500,
 ) -> DatasetWrapper:
+    nonfeature_columns = activity_df.columns
     dataset_df = pd.concat([activity_df, descriptors_df], axis=1)
     dataset_df.replace([np.inf, -np.inf], np.nan, inplace=True)
     dataset_df.dropna(inplace=True)
     dataset = DatasetWrapper.load_unsplit_dataset(
-        dataset_df, target_column, holdout_size, random_state, preprocessing_size
+        full_df=dataset_df,
+        target_column=target_column,
+        nonfeature_columns=nonfeature_columns,
+        holdout_size=holdout_size,
+        random_state=random_state,
+        preprocessing_size=preprocessing_size,
     )
 
     return dataset
+
+
+class MLConfig:
+
+    def __init__(self, task=None, algorithm=None, scoring=None):
+        self.task = task
+        self.algorithm = algorithm
+        self.scoring = scoring
+
+    def set_scoring(self, scoring_list: str | list[str], quantile_alpha=0.9):
+        scoring_dict: dict = {
+            "r2": metrics.make_scorer(metrics.r2_score),
+            "rmse": metrics.make_scorer(
+                lambda y_true, y_pred: metrics.root_mean_squared_error(y_true, y_pred)
+            ),
+            "mae": metrics.make_scorer(metrics.mean_absolute_error),
+            "quantile": metrics.make_scorer(
+                lambda y_true, y_pred: metrics.mean_pinball_loss(
+                    y_true, y_pred, alpha=quantile_alpha
+                )
+            ),
+        }
+        if type(scoring_list) == str:
+            scoring_list = [scoring_list]
+        scoring: dict = {}
+        for i in scoring_list:
+            try:
+                metric = scoring_dict[i]
+                scoring[i] = metric
+            except KeyError as e:
+                print(f"{i} is not available as a scoring metric")
+                print(e)
+        self.scoring = scoring
+        return scoring
+
+
+# algoritmo
+# tipo de erro
+# classificação x regressão
+# otimização
+# implementação em dataset externo
+# diagnóstico de resíduos
