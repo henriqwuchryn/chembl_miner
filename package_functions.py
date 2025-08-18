@@ -8,6 +8,7 @@ import miscelanneous_methods as mm
 
 
 class DatasetWrapper:
+
     def __init__(
         self, general_data=None, x_train=None, x_test=None, y_train=None, y_test=None
     ):
@@ -22,7 +23,8 @@ class DatasetWrapper:
         self.x_preprocessing = pd.DataFrame()
         self.y_preprocessing = pd.DataFrame()
 
-    def subset_general_data(self, subset="train"):
+
+    def subset_general_data(self, subset="train") -> pd.DataFrame:
         """
         Retrieves the corresponding rows from general_data for the train or test dataset.
 
@@ -39,7 +41,8 @@ class DatasetWrapper:
         else:
             raise ValueError("Subset must be 'train' or 'test'.")
 
-    def save(self, file_path):
+
+    def save(self, file_path) -> None:
         """
         Saves the entire dataset to CSV files.
         """
@@ -56,7 +59,8 @@ class DatasetWrapper:
         self.y_preprocessing.to_csv(f"{file_path}/tpr.csv", index_label="index")
         print(f"Dataset saved to {file_path}")
 
-    def load(self, file_path):
+
+    def load(self, file_path) -> None:
         """
         Loads the dataset from CSV files.
         """
@@ -82,6 +86,7 @@ class DatasetWrapper:
             print(e)
             print("Dataset loading failed")
 
+
     def load_unsplit_dataframe(
         self,
         full_df,
@@ -90,7 +95,7 @@ class DatasetWrapper:
         holdout_size,
         random_state,
         preprocessing_size,
-    ):
+    ) -> None:
         """
         Loads an unsplit dataframe containing all columns and splits it into
         general_data, x_train/test, and y_train/test.
@@ -115,7 +120,10 @@ class DatasetWrapper:
             random_state=random_state, preprocessing_size=preprocessing_size
         )
 
-    def create_preprocessing_dataset(self, random_state, preprocessing_size=7500):
+
+    def create_preprocessing_dataset(
+        self, random_state, preprocessing_size=7500
+    ) -> None:
         """
         Creates a preprocessing dataset by sampling from the train dataset.
         If the train dataset is larger max_samples, it samples this amount of samples (default: 7500).
@@ -135,7 +143,8 @@ class DatasetWrapper:
             self.y_preprocessing = self.y_train
             print("Preprocessing dataset uses the entire train dataset.")
 
-    def describe(self):
+
+    def describe(self) -> None:
         size = self.general_data.shape[0]
         features = self.x_train.shape[1]
         size_train = self.y_train.shape[0]
@@ -149,11 +158,13 @@ class DatasetWrapper:
                 "This dataset contains a preprocessing subset of 7500 samples for hyperparameter optimization and feature selection"
             )
 
+
     @staticmethod
-    def load_dataset(file_path):
+    def load_dataset(file_path) -> DatasetWrapper:
         instance = DatasetWrapper()
         instance.load(file_path=file_path)
         return instance
+
 
     @staticmethod
     def load_unsplit_dataset(
@@ -163,7 +174,7 @@ class DatasetWrapper:
         holdout_size,
         random_state,
         preprocessing_size,
-    ):
+    ) -> DatasetWrapper:
         instance = DatasetWrapper()
         instance.load_unsplit_dataframe(
             full_df=full_df,
@@ -298,12 +309,13 @@ def assemble_dataset(
 
 class MLConfig:
 
-    def __init__(self, task=None, algorithm=None, scoring=None):
-        self.task = task
+    def __init__(self, algorithm=None, scoring=None, param_grid=None):
         self.algorithm = algorithm
         self.scoring = scoring
+        self.param_grid = param_grid
 
-    def set_scoring(self, scoring_list: str | list[str], quantile_alpha=0.9):
+
+    def set_scoring(self, scoring_list: str | list[str], alpha: float) -> None:
         scoring_dict: dict = {
             "r2": metrics.make_scorer(metrics.r2_score),
             "rmse": metrics.make_scorer(
@@ -312,7 +324,7 @@ class MLConfig:
             "mae": metrics.make_scorer(metrics.mean_absolute_error),
             "quantile": metrics.make_scorer(
                 lambda y_true, y_pred: metrics.mean_pinball_loss(
-                    y_true, y_pred, alpha=quantile_alpha
+                    y_true, y_pred, alpha=alpha
                 )
             ),
         }
@@ -327,8 +339,158 @@ class MLConfig:
                 print(f"{i} is not available as a scoring metric")
                 print(e)
         self.scoring = scoring
-        return scoring
 
+
+    def set_algorithm(
+        self,
+        algorithm_name: str | None,
+        algorithm,
+        param_grid,
+        random_state,
+    ) -> None:
+
+        algorithms: dict = {
+            "bagging_reg": BaggingRegressor(random_state=random_state),
+            "extratrees_reg": ExtraTreesRegressor(random_state=random_state),
+            "gradboost_reg": GradientBoostingRegressor(random_state=random_state),
+            "histgradboost_reg": HistGradientBoostingRegressor(
+                random_state=random_state
+            ),
+            "randomforest_reg": RandomForestRegressor(random_state=random_state),
+            "xgboost_reg": XGBRegressor(random_state=random_state),
+        }
+        param_grids: dict = {
+            "bagging_reg": {
+                "n_estimators": Integer(lower=10, upper=1000),  # 10
+                "max_samples": Continuous(lower=0.1, upper=1.0),  # 1.0
+                "max_features": Continuous(lower=0.1, upper=1.0),  # 1.0
+                "bootstrap": Categorical(
+                    choices=[True, False]
+                ),  # Whether samples are drawn with replacement
+                "bootstrap_features": Categorical(
+                    choices=[True, False]
+                ),  # Whether features are drawn with replacement
+            },
+            "extratrees_reg": {
+                "n_estimators": Integer(lower=100, upper=2000),  # 100
+                "max_depth": Categorical([None]),  # None
+                "min_samples_split": Integer(lower=2, upper=20),  # 2
+                "min_samples_leaf": Integer(lower=1, upper=20),  # 1
+                "max_features": Continuous(
+                    lower=0.1, upper=1
+                ),  # Number of features to consider for splits
+                "bootstrap": Categorical(
+                    choices=[True, False]
+                ),  # Whether bootstrap samples are used
+            },
+            "gradboost_reg": {
+                "n_estimators": Integer(lower=100, upper=2000),  # 100
+                "learning_rate": Continuous(lower=0.001, upper=1),  # 0.1
+                "max_depth": Integer(lower=3, upper=100),  # 3
+                "min_samples_split": Integer(lower=2, upper=20),  # 2
+                "min_samples_leaf": Integer(lower=1, upper=20),  # 1
+                "subsample": Continuous(lower=0.1, upper=1.0),  # 1.0
+                "max_features": Continuous(lower=0.1, upper=1.0),  # 1.0
+            },
+            "histgradboost_reg": {
+                "loss": Categorical(
+                    choices=["squared_error", "absolute_error"]
+                ),  # squared_error
+                "max_iter": Integer(lower=100, upper=2000),  # 100
+                "learning_rate": Continuous(lower=0.001, upper=1),
+                "max_depth": Categorical(choices=[None]),  # None
+                "min_samples_leaf": Integer(lower=10, upper=200),  # 20
+                "max_leaf_nodes": Integer(lower=10, upper=200),  # 61
+                "l2_regularization": Continuous(lower=0.1, upper=2.0),  # 0
+                "max_bins": Integer(lower=100, upper=255),  # 255
+            },
+            "lgbm_reg": {
+                "n_estimators": Integer(lower=100, upper=2000),  # 100
+                "learning_rate": Continuous(lower=0.001, upper=1),  # 0.1
+                "max_depth": Integer(lower=3, upper=100),  # -1
+                "num_leaves": Integer(lower=2, upper=200),  # 31
+                "min_child_samples": Integer(lower=2, upper=200),  # 20
+                "subsample": Continuous(
+                    lower=0.1, upper=1
+                ),  # Fraction of samples used for fitting
+                "colsample_bytree": Continuous(
+                    lower=0.1, upper=1
+                ),  # Fraction of features used for fitting
+                "reg_alpha": Continuous(lower=0.1, upper=2.0),  # L1 regularization
+                "reg_lambda": Continuous(lower=0.1, upper=2.0),  # L2 regularization
+                "force_row_wise": Categorical(choices=[True]),
+            },
+            "randomforest_reg": {
+                "n_estimators": Integer(lower=100, upper=2000),  # 100
+                "max_depth": Categorical([None]),  # None
+                "min_samples_split": Integer(lower=2, upper=20),  # 2
+                "min_samples_leaf": Integer(lower=1, upper=20),  # 1
+                "max_features": Continuous(lower=0.1, upper=1),  # 1.0
+                "bootstrap": Categorical(
+                    choices=[True, False]
+                ),  # Whether bootstrap samples are used
+            },
+            "xgboost_reg": {
+                "n_estimators": Integer(lower=100, upper=2000),
+                "learning_rate": Continuous(lower=0.001, upper=1),
+                "max_depth": Integer(lower=0, upper=100),
+                "min_child_weight": Continuous(
+                    lower=0.1, upper=2.0
+                ),  # Minimum sum of instance weight needed in a child
+                "gamma": Continuous(
+                    lower=0.1, upper=2.0
+                ),  # Minimum loss reduction required to make a split
+                "subsample": Continuous(
+                    lower=0.1, upper=1
+                ),  # Fraction of samples used for fitting
+                "colsample_bytree": Continuous(
+                    lower=0.1, upper=1
+                ),  # Fraction of features used for fitting
+                "reg_alpha": Continuous(lower=0.1, upper=2.0),  # L1 regularization
+                "reg_lambda": Continuous(lower=0.1, upper=2.0),  # L2 regularization
+            },
+        }
+
+        if algorithm_name == None:
+            print("algorithm_name not provided")
+            if (algorithm == None) | (param_grid == None):
+                print(
+                    "please provide algorithm as well as a parameter grid valid for sklearn_genetic (https://sklearn-genetic-opt.readthedocs.io/en/stable/api/space.html)"
+                )
+            print(
+                "package functionality might not work properly with external algorithms"
+            )
+            self.algorithm = algorithm
+            self.param_grid = param_grid
+        else:
+            try:
+                self.algorithm = algorithm[algorithm_name]
+                self.param_grid = param_grids[algorithm_name]
+            except KeyError as e:
+                print("provided algorithm_name not available, check docs")
+                print(e)
+
+
+    @staticmethod
+    def setup(algorithm_name, scoring_list: str | list[str], random_state: int=42, algorithm=None, param_grid=None, **scoring_params) -> MLConfig:
+        instance = MLConfig()
+        instance.set_algorithm(
+            algorithm_name=algorithm_name,
+            algorithm=algorithm,
+            param_grid=param_grid,
+            random_state=random_state
+        )
+        
+        alpha: float = 0.9
+        if 'alpha' in scoring_params.keys():
+            if not 0 < scoring_params['alpha'] <= 1:
+                print('alpha must be between 0 and 1')
+            try:
+                alpha = scoring_params['alpha']
+            except TypeError as e:
+                print('provided alpha not a valid float number')
+            
+        instance.set_scoring(scoring_list=scoring_list, alpha=alpha)
 
 # algoritmo
 # tipo de erro
