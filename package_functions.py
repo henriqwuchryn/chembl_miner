@@ -492,6 +492,20 @@ class MLConfig:
             
         instance.set_scoring(scoring_list=scoring_list, alpha=alpha)
 
+
+def optimize_params():
+    
+    return
+
+
+def residue_diagnosis():
+
+    return
+
+
+def deploy():
+
+    return
 # algoritmo
 # tipo de erro
 # classificação x regressão
