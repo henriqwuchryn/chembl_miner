@@ -23,7 +23,6 @@ class DatasetWrapper:
         self.x_preprocessing = pd.DataFrame()
         self.y_preprocessing = pd.DataFrame()
 
-
     def subset_general_data(self, subset="train") -> pd.DataFrame:
         """
         Retrieves the corresponding rows from general_data for the train or test dataset.
@@ -41,7 +40,6 @@ class DatasetWrapper:
         else:
             raise ValueError("Subset must be 'train' or 'test'.")
 
-
     def save(self, file_path) -> None:
         """
         Saves the entire dataset to CSV files.
@@ -58,7 +56,6 @@ class DatasetWrapper:
         self.x_preprocessing.to_csv(f"{file_path}/fpr.csv", index_label="index")
         self.y_preprocessing.to_csv(f"{file_path}/tpr.csv", index_label="index")
         print(f"Dataset saved to {file_path}")
-
 
     def load(self, file_path) -> None:
         """
@@ -85,7 +82,6 @@ class DatasetWrapper:
         except Exception as e:
             print(e)
             print("Dataset loading failed")
-
 
     def load_unsplit_dataframe(
         self,
@@ -120,7 +116,6 @@ class DatasetWrapper:
             random_state=random_state, preprocessing_size=preprocessing_size
         )
 
-
     def create_preprocessing_dataset(
         self, random_state, preprocessing_size=7500
     ) -> None:
@@ -143,7 +138,6 @@ class DatasetWrapper:
             self.y_preprocessing = self.y_train
             print("Preprocessing dataset uses the entire train dataset.")
 
-
     def describe(self) -> None:
         size = self.general_data.shape[0]
         features = self.x_train.shape[1]
@@ -158,13 +152,11 @@ class DatasetWrapper:
                 "This dataset contains a preprocessing subset of 7500 samples for hyperparameter optimization and feature selection"
             )
 
-
     @staticmethod
     def load_dataset(file_path) -> DatasetWrapper:
         instance = DatasetWrapper()
         instance.load(file_path=file_path)
         return instance
-
 
     @staticmethod
     def load_unsplit_dataset(
@@ -309,11 +301,14 @@ def assemble_dataset(
 
 class MLConfig:
 
-    def __init__(self, algorithm=None, scoring=None, param_grid=None):
+    def __init__(
+        self, algorithm_name=None, algorithm=None, scoring=None, param_grid=None
+    ):
+        self.algorithm_name = algorithm_name
         self.algorithm = algorithm
         self.scoring = scoring
         self.param_grid = param_grid
-
+        self.params = {}
 
     def set_scoring(self, scoring_list: str | list[str], alpha: float) -> None:
         scoring_dict: dict = {
@@ -338,14 +333,13 @@ class MLConfig:
             except KeyError as e:
                 print(f"{i} is not available as a scoring metric")
                 print(e)
+        #TODO: add logic to add external scoring callables
         self.scoring = scoring
-
 
     def set_algorithm(
         self,
         algorithm_name: str | None,
         algorithm,
-        param_grid,
         random_state,
     ) -> None:
 
@@ -359,6 +353,40 @@ class MLConfig:
             "randomforest_reg": RandomForestRegressor(random_state=random_state),
             "xgboost_reg": XGBRegressor(random_state=random_state),
         }
+        if algorithm_name == None:
+            print("algorithm_name not provided")
+            if algorithm == None:
+                print("please provide an algorithm object")
+            print(
+                "package functionality might not work properly with external algorithms"
+            )
+            self.algorithm = algorithm
+        else:
+            try:
+                self.algorithm = algorithm[algorithm_name]
+                self.param_grid = param_grids[algorithm_name]
+            except KeyError as e:
+                print("provided algorithm_name not available, check docs")
+                print(e)
+
+    def optimize_hyperparameters(
+        self,
+        dataset: DatasetWrapper,
+        param_grid: dict | None,
+        population_size=30,
+        generations=30,
+        refit="r2",
+    ) -> None:
+        if self.algorithm == None:
+            print("define algorithm using setup()")
+            return
+        if dataset.x_train == None:
+            print("dataset empty")
+            return
+        if (self.algorithm_name == None) and (param_grid == None):
+            print(
+                "param_grid not provided. provide a param_grid compatible with sklearn_genetic (https://sklearn-genetic-opt.readthedocs.io/en/stable/api/space.html)\nalternatively, provide algorithm_name, to use one of the param_grids provided"
+            )
         param_grids: dict = {
             "bagging_reg": {
                 "n_estimators": Integer(lower=10, upper=1000),  # 10
@@ -450,52 +478,53 @@ class MLConfig:
                 "reg_lambda": Continuous(lower=0.1, upper=2.0),  # L2 regularization
             },
         }
-
-        if algorithm_name == None:
-            print("algorithm_name not provided")
-            if (algorithm == None) | (param_grid == None):
-                print(
-                    "please provide algorithm as well as a parameter grid valid for sklearn_genetic (https://sklearn-genetic-opt.readthedocs.io/en/stable/api/space.html)"
-                )
-            print(
-                "package functionality might not work properly with external algorithms"
-            )
-            self.algorithm = algorithm
-            self.param_grid = param_grid
-        else:
+        if param_grid == None:
             try:
-                self.algorithm = algorithm[algorithm_name]
-                self.param_grid = param_grids[algorithm_name]
+                param_grid = param_grids[algorithm_name]
             except KeyError as e:
                 print("provided algorithm_name not available, check docs")
-                print(e)
-
+        try:
+            search_cv_results, best_params, time_to_execute = mlm.evaluate_and_optimize(
+                algorithm=self.algorithm,
+                param_grid=param_grid,
+                x_train=dataset.x_train,
+                y_train=dataset.y_train,
+                scoring=self.scoring,
+                algorithm_name=self.algorithm_name,
+                population_size=population_size,
+                generations=generations,
+                refit=refit,
+            )
+        except Exception as e:
+            print(f"something went wrong, check error:\n\n{e}")
+        self.params = best_params
+        return search_cv_results, best_params, time_to_execute
 
     @staticmethod
-    def setup(algorithm_name, scoring_list: str | list[str], random_state: int=42, algorithm=None, param_grid=None, **scoring_params) -> MLConfig:
+    def setup(
+        algorithm_name=None,
+        scoring_list: str | list[str] = ["r2"],
+        random_state: int = 42,
+        algorithm=None,
+        **scoring_params,
+    ) -> MLConfig:
         instance = MLConfig()
         instance.set_algorithm(
             algorithm_name=algorithm_name,
             algorithm=algorithm,
-            param_grid=param_grid,
-            random_state=random_state
+            random_state=random_state,
         )
-        
-        alpha: float = 0.9
-        if 'alpha' in scoring_params.keys():
-            if not 0 < scoring_params['alpha'] <= 1:
-                print('alpha must be between 0 and 1')
+
+        alpha: float = 0.5
+        if "alpha" in scoring_params.keys():
+            if not 0 < scoring_params["alpha"] <= 1:
+                print("alpha must be between 0 and 1")
             try:
-                alpha = scoring_params['alpha']
+                alpha = scoring_params["alpha"]
             except TypeError as e:
-                print('provided alpha not a valid float number')
-            
+                print("provided alpha not a valid float number")
+
         instance.set_scoring(scoring_list=scoring_list, alpha=alpha)
-
-
-def optimize_params():
-    
-    return
 
 
 def residue_diagnosis():
@@ -506,6 +535,8 @@ def residue_diagnosis():
 def deploy():
 
     return
+
+
 # algoritmo
 # tipo de erro
 # classificação x regressão
