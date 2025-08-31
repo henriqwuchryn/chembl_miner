@@ -302,15 +302,20 @@ def assemble_dataset(
 class MLConfig:
 
     def __init__(
-        self, algorithm_name=None, algorithm=None, scoring=None, param_grid=None
+        self, algorithm_name=None, algorithm=None, scoring=None, param_grid: dict={}, params: dict={}
     ):
         self.algorithm_name = algorithm_name
         self.algorithm = algorithm
         self.scoring = scoring
         self.param_grid = param_grid
-        self.params = {}
+        self.params = params
 
-    def set_scoring(self, scoring_list: str | list[str], alpha: float) -> None:
+    def set_scoring(
+        self,
+        scoring_names: str | list[str] | None,
+        scoring: dict | None,
+        alpha: float = 0.5,
+        ) -> None:
         scoring_dict: dict = {
             "r2": metrics.make_scorer(metrics.r2_score),
             "rmse": metrics.make_scorer(
@@ -323,24 +328,33 @@ class MLConfig:
                 )
             ),
         }
-        if type(scoring_list) == str:
-            scoring_list = [scoring_list]
+        if scoring_names == None:
+            print("scoring_names not provided")
+            if scoring == None:
+                print("please provide an scoring object at scoring parameter or use one or more of the embedded ones with scoring_names (docs). External scoring objects must follow this structure: \\{'name': sklearn.metrics.make_scorer(score_function(y_true,y_pred,kw_args))\\}. Multiple scoring functions are supported. The scorer name must be configured when optimizing hyperparameters")
+                return
+            print(
+                "package functionality might not work properly with external scoring functions"
+            )
+            self.scoring = scoring
+        if type(scoring_names) == str:
+            scoring_names = [scoring_names]
         scoring: dict = {}
-        for i in scoring_list:
+        for i in scoring_names:
             try:
                 metric = scoring_dict[i]
                 scoring[i] = metric
             except KeyError as e:
                 print(f"{i} is not available as a scoring metric")
                 print(e)
-        #TODO: add logic to add external scoring callables
+
         self.scoring = scoring
 
     def set_algorithm(
         self,
         algorithm_name: str | None,
         algorithm,
-        random_state,
+        random_state: int,
     ) -> None:
 
         algorithms: dict = {
@@ -356,7 +370,8 @@ class MLConfig:
         if algorithm_name == None:
             print("algorithm_name not provided")
             if algorithm == None:
-                print("please provide an algorithm object")
+                print("please provide an algorithm object at algorithm parameter or use one of the embedded ones with algorithm_name (docs)")
+                return
             print(
                 "package functionality might not work properly with external algorithms"
             )
@@ -503,7 +518,7 @@ class MLConfig:
     @staticmethod
     def setup(
         algorithm_name=None,
-        scoring_list: str | list[str] = ["r2"],
+        scoring_names: str | list[str] = ["r2"],
         random_state: int = 42,
         algorithm=None,
         **scoring_params,
@@ -514,17 +529,18 @@ class MLConfig:
             algorithm=algorithm,
             random_state=random_state,
         )
-
-        alpha: float = 0.5
         if "alpha" in scoring_params.keys():
-            if not 0 < scoring_params["alpha"] <= 1:
+            alpha = scoring_params["alpha"]
+            if type(alpha)!= float:
+                print('alpha must be a float between 0 and 1')
+            elif not 0 < alpha <= 1:
                 print("alpha must be between 0 and 1")
-            try:
-                alpha = scoring_params["alpha"]
-            except TypeError as e:
-                print("provided alpha not a valid float number")
+            else:
+                instance.set_scoring(scoring_names=scoring_names, alpha=alpha)
+        
+        instance.set_scoring(scoring_names=scoring_names)
 
-        instance.set_scoring(scoring_list=scoring_list, alpha=alpha)
+        return instance
 
 
 def residue_diagnosis():
