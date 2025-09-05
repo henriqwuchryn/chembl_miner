@@ -10,6 +10,7 @@ from sklearn.metrics import root_mean_squared_error
 from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import r2_score
 from sklearn.metrics import mean_pinball_loss
+from sklearn.base import BaseEstimator
 from sklearn.ensemble import BaggingRegressor
 from sklearn.ensemble import ExtraTreesRegressor
 from sklearn.ensemble import GradientBoostingRegressor
@@ -20,6 +21,7 @@ from sklearn_genetic import GASearchCV
 from sklearn_genetic.space import Categorical
 from sklearn_genetic.space import Continuous
 from sklearn_genetic.space import Integer
+from sklearn.model_selection import cross_validate
 import machine_learning_methods as mlm
 import molecules_manipulation_methods as mmm
 import miscelanneous_methods as mm
@@ -40,6 +42,7 @@ class DatasetWrapper:
         self.y_test = y_test if y_test is not None else pd.DataFrame()
         self.x_preprocessing = pd.DataFrame()
         self.y_preprocessing = pd.DataFrame()
+        # TODO: fix local / global vars here
 
     def subset_general_data(self, subset="train") -> pd.DataFrame:
         """
@@ -200,7 +203,11 @@ def get_activity_data(
     target_chembl_id: str,
     activity_type: str,
     convert_units: bool = True,
-    activity_thresholds: dict[str, float] | None = {"active": 1000, "intermediate": 10000},
+    duplicate_treatment="median",
+    activity_thresholds: dict[str, float] | None = {
+        "active": 1000,
+        "intermediate": 10000,
+    },
 ) -> pd.DataFrame:
     """
     Fetches and processes activity data from the ChEMBL database for a given target ID and activity type.
@@ -211,7 +218,7 @@ def get_activity_data(
     Returns:
         dataset (pd.DataFrame): A dataframe object containing the processed dataset.
     """
-    activity = new_client.activity # type: ignore
+    activity = new_client.activity  # type: ignore
     activity_query = activity.filter(target_chembl_id=target_chembl_id)
     activity_query = activity_query.filter(standard_type=activity_type)
     activity_df: pd.DataFrame = pd.DataFrame(data=activity_query)
@@ -228,19 +235,22 @@ def get_activity_data(
         arg=activity_df["standard_value"], errors="coerce"
     )
     activity_df = activity_df[activity_df["standard_value"] > 0]
-    activity_df = (
-        activity_df.dropna().drop_duplicates("canonical_smiles").reset_index(drop=True)
-    )
+    activity_df = activity_df.dropna()
     activity_df = mmm.getLipinskiDescriptors(molecules_df=activity_df)
     activity_df = mmm.getRo5Violations(molecules_df=activity_df)
     if convert_units:
         activity_df = mmm.convert_to_M(molecules_df=activity_df)
+    activity_df = mm.treat_duplicates(activity_df, method=duplicate_treatment)
+    activity_df = activity_df.drop_duplicates("molecule_chembl_id")
+    activity_df = activity_df.reset_index(drop=True)
     activity_df = mm.normalizeValue(molecules_df=activity_df)
     activity_df = mm.getNegLog(molecules_df=activity_df)
     if activity_thresholds != None:
         bioactivity_class = []
-        sorted_thresholds = sorted(activity_thresholds.items(), key=lambda item: item[1])
-        
+        sorted_thresholds = sorted(
+            activity_thresholds.items(), key=lambda item: item[1]
+        )
+
         for i in activity_df.standard_value:
             value_nM = float(i) * 1e9  # mol/l to nmol/L
             assigned_class = "inactive"
@@ -258,7 +268,7 @@ def get_activity_data(
 def calculate_fingerprint(
     activity_df: pd.DataFrame,
     fingerprint: str | list[str] = "pubchem",
-    scale_features: bool = True
+    scale_features: bool = True,
 ) -> pd.DataFrame:
 
     fingerprint_dict = {
@@ -290,9 +300,7 @@ def calculate_fingerprint(
         descriptors_df = pd.concat(objs=[descriptors_df, descriptors_df_i], axis=1)
         os.remove("descriptors.csv")
         os.remove("descriptors.csv.log")
-    descriptors_df = mlm.scale_features(
-        features=descriptors_df, scaler=MinMaxScaler()
-    )
+    descriptors_df = mlm.scale_features(features=descriptors_df, scaler=MinMaxScaler())
     descriptors_df = mm.remove_low_variance_columns(
         input_data=descriptors_df, threshold=0
     )
@@ -328,9 +336,9 @@ class MLConfig:
 
     def __init__(
         self,
-        algorithm_name=None,
-        algorithm=None,
-        scoring=None,
+        algorithm_name: str | None = None,
+        algorithm: BaseEstimator | None = None,
+        scoring: dict | None = None,
         param_grid: dict = {},
         params: dict = {},
     ):
@@ -343,23 +351,23 @@ class MLConfig:
     def set_scoring(
         self,
         scoring_names: str | list[str],
-        scoring: dict | None, # type: ignore
+        scoring: dict | None,  # type: ignore
         alpha: float,
     ) -> None:
-        scoring_dict: dict = {
-            "r2": make_scorer(r2_score),
-            "rmse": make_scorer(
-                lambda y_true, y_pred: root_mean_squared_error(y_true, y_pred)
-            ),
-            "mae": make_scorer(mean_absolute_error),
-            "quantile": make_scorer(
-                lambda y_true, y_pred: mean_pinball_loss(
-                    y_true, y_pred, alpha=alpha
-                )
-            ),
-        }
-       
+
         if scoring == None:
+            scoring_dict: dict = {
+                "r2": make_scorer(r2_score),
+                "rmse": make_scorer(
+                    lambda y_true, y_pred: root_mean_squared_error(y_true, y_pred)
+                ),
+                "mae": make_scorer(mean_absolute_error),
+                "quantile": make_scorer(
+                    lambda y_true, y_pred: mean_pinball_loss(
+                        y_true, y_pred, alpha=alpha
+                    )
+                ),
+            }
             scoring: dict = {}
             if type(scoring_names) == str:
                 scoring_names = [scoring_names]
@@ -378,46 +386,41 @@ class MLConfig:
             )
             self.scoring = scoring
 
-
     def set_algorithm(
         self,
         algorithm_name: str | None,
-        algorithm,
+        algorithm: BaseEstimator | None,
         random_state: int,
     ) -> None:
 
-        algorithms: dict = {
-            "bagging_reg": BaggingRegressor(random_state=random_state),
-            "extratrees_reg": ExtraTreesRegressor(random_state=random_state),
-            "gradboost_reg": GradientBoostingRegressor(random_state=random_state),
-            "histgradboost_reg": HistGradientBoostingRegressor(
-                random_state=random_state
-            ),
-            "randomforest_reg": RandomForestRegressor(random_state=random_state),
-            "xgboost_reg": XGBRegressor(random_state=random_state),
-        }
-        if algorithm_name == None:
-            print("algorithm_name not provided")
-            if algorithm == None:
-                print(
-                    "please provide an algorithm object at algorithm parameter or use one of the embedded ones with algorithm_name (docs)"
-                )
-                return
+        if algorithm == None:
+            if algorithm_name == None:
+                print("please, provide an algorithm_name or algorithm object")
+            algorithms: dict = {
+                "bagging_reg": BaggingRegressor(random_state=random_state),
+                "extratrees_reg": ExtraTreesRegressor(random_state=random_state),
+                "gradboost_reg": GradientBoostingRegressor(random_state=random_state),
+                "histgradboost_reg": HistGradientBoostingRegressor(
+                    random_state=random_state
+                ),
+                "randomforest_reg": RandomForestRegressor(random_state=random_state),
+                "xgboost_reg": XGBRegressor(random_state=random_state),
+            }
+            try:
+                self.algorithm = algorithms[algorithm_name]
+                self.algorithm_name = algorithm_name
+            except KeyError as e:
+                print(f"{algorithm_name} algorithm is not available, check docs")
+                print(e)
+        else:
+            self.algorithm = algorithm
             print(
                 "package functionality might not work properly with external algorithms"
             )
-            self.algorithm = algorithm
-        else:
-            try:
-                self.algorithm = algorithm[algorithm_name]
-            except KeyError as e:
-                print("provided algorithm_name not available, check docs")
-                print(e)
 
     def optimize_hyperparameters(
         self,
         dataset: DatasetWrapper,
-        algorithm_name: str | None,
         param_grid: dict | None,
         refit: str,
         population_size: int = 30,
@@ -433,7 +436,7 @@ class MLConfig:
             print(
                 "param_grid not provided. provide a param_grid compatible with sklearn_genetic (https://sklearn-genetic-opt.readthedocs.io/en/stable/api/space.html)\nalternatively, provide algorithm_name, to use one of the param_grids provided"
             )
-
+            return
 
         if param_grid == None:
             param_grids: dict = {
@@ -528,7 +531,7 @@ class MLConfig:
                 },
             }
             try:
-                param_grid = param_grids[algorithm_name]
+                param_grid = param_grids[self.algorithm_name]
             except KeyError as e:
                 print(f"{e}\n\nprovided algorithm_name not available, check docs")
         try:
@@ -542,29 +545,69 @@ class MLConfig:
                 population_size=population_size,
                 generations=generations,
                 refit=refit,
-            ) #TODO: rewrite code directly here from annex file
+            )  # TODO: rewrite code directly here from annex file
         except Exception as e:
             print(f"something went wrong, check error:\n\n{e}")
             return
         self.params = best_params
         return search_cv_results, best_params, time_to_execute
 
+    def evaluate_model(
+        self,
+        dataset: DatasetWrapper,
+        cv: int = 10,
+        params: dict | None = None,
+        n_jobs=-1,
+    ):
+
+        if self.algorithm == None:
+            print("define algorithm using setup()")
+            return
+        if dataset.x_train == None:
+            print("dataset empty")
+            return
+        if params != None:
+            algorithm = self.algorithm.set_params(**params)
+        elif self.params != None:
+            algorithm = self.algorithm.set_params(**self.params)
+        else:
+            algorithm = self.algorithm
+
+        cv_results = cross_validate(
+            estimator=algorithm,
+            X=dataset.x_train,
+            y=dataset.y_train,
+            cv=cv,
+            scoring=self.scoring,
+            n_jobs=n_jobs,
+            return_train_score=True,
+        )
+        # TODO: add a way to visualize cv results with generalization
+        return cv_results
+
     @staticmethod
     def setup(
         algorithm_name=None,
-        scoring_names: str | list[str] = ["r2", "rmse", "mae"],
-        random_state: int = 42,
         algorithm=None,
+        scoring_names: str | list[str] = ["r2", "rmse", "mae"],
+        scoring=None,
+        random_state: int = 42,
         **scoring_params,
     ):
+        if (algorithm_name == None) and (algorithm == None):
+            print(
+                "you must select an algorithm_name from the docs or provide an algorithm object"
+            )
+            return
+
         instance = MLConfig()
         instance.set_algorithm(
             algorithm_name=algorithm_name,
             algorithm=algorithm,
             random_state=random_state,
         )
-        
-        #checking scoring_params for embedded scoring functions
+
+        # checking scoring_params for embedded scoring functions
         if "alpha" in scoring_params.keys():
             alpha = scoring_params["alpha"]
             if type(alpha) != float:
@@ -576,10 +619,7 @@ class MLConfig:
         else:
             alpha: float = 0.5
 
-        instance.set_scoring(
-            scoring_names=scoring_names,
-            scoring=None,
-            alpha=alpha)
+        instance.set_scoring(scoring_names=scoring_names, scoring=scoring, alpha=alpha)
 
         return instance
 

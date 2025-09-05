@@ -80,3 +80,27 @@ def mannwhitney_test(col_name:str, molecules_df1, molecules_df2, alpha:float=0.0
   # filename = 'mannwhitneyu_' + descriptor + '.csv'
   # results.to_csv(filename,index=False)
   return results
+
+
+def treat_duplicates(molecules_df, method = 'median'):
+   
+  duplicates: pd.Series = molecules_df['molecule_chembl_id'].value_counts()
+  duplicates: pd.Series = duplicates[duplicates>1]
+  treated_molecules_df = molecules_df.copy()
+  for molecule_chembl_id in duplicates.index:
+    standard_values = treated_molecules_df[treated_molecules_df['molecule_chembl_id']==molecule_chembl_id]['standard_value']
+    if method == 'mean':
+      value: float = standard_values.mean()
+    elif method == 'median':
+      value: float = standard_values.median()
+    elif method == 'max':
+      value: float = standard_values.max()
+    elif method == 'min':
+      value: float = standard_values.min()
+    elif method == 'sample':
+      value: float = standard_values.sample(n=1).values[0]
+    else:
+      value: float = standard_values.mean()
+    for index in standard_values:
+        treated_molecules_df.at[index, 'standard_value'] = value
+  return treated_molecules_df
