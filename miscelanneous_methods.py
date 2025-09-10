@@ -82,8 +82,9 @@ def mannwhitney_test(col_name:str, molecules_df1, molecules_df2, alpha:float=0.0
   return results
 
 
-def treat_duplicates(molecules_df, method = 'median'):
+def treat_duplicates(molecules_df, method = 'median') -> pd.DataFrame:
    
+  print(f"dataframe initial size: {molecules_df.shape[0]}")
   duplicates: pd.Series = molecules_df['molecule_chembl_id'].value_counts()
   duplicates: pd.Series = duplicates[duplicates>1]
   treated_molecules_df = molecules_df.copy()
@@ -103,4 +104,6 @@ def treat_duplicates(molecules_df, method = 'median'):
       value: float = standard_values.mean()
     for index in standard_values:
         treated_molecules_df.at[index, 'standard_value'] = value
+    treated_molecules_df = treated_molecules_df.drop_duplicates(subset='molecule_chembl_id')
+    print(f"dataframe filtered size: {treated_molecules_df.shape[0]}")
   return treated_molecules_df

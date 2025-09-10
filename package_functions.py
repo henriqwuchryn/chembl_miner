@@ -30,19 +30,25 @@ import miscelanneous_methods as mm
 class DatasetWrapper:
 
     def __init__(
-        self, general_data=None, x_train=None, x_test=None, y_train=None, y_test=None
+        self,
+        general_data=pd.DataFrame(),
+        x_train=pd.DataFrame(),
+        x_test=pd.DataFrame(),
+        y_train=pd.DataFrame(),
+        y_test=pd.DataFrame(),
+        x_preprocessing=pd.DataFrame(),
+        y_preprocessing=pd.DataFrame(),
     ):
         """
         Initializes the DatasetWrapper with optional dataframes.
         """
-        self.general_data = general_data if general_data is not None else pd.DataFrame()
-        self.x_train = x_train if x_train is not None else pd.DataFrame()
-        self.x_test = x_test if x_test is not None else pd.DataFrame()
-        self.y_train = y_train if y_train is not None else pd.DataFrame()
-        self.y_test = y_test if y_test is not None else pd.DataFrame()
-        self.x_preprocessing = pd.DataFrame()
-        self.y_preprocessing = pd.DataFrame()
-        # TODO: fix local / global vars here
+        self.general_data = general_data
+        self.x_train = x_train
+        self.x_test = x_test
+        self.y_train = y_train
+        self.y_test = y_test
+        self.x_preprocessing = x_preprocessing
+        self.y_preprocessing = y_preprocessing
 
     def subset_general_data(self, subset="train") -> pd.DataFrame:
         """
@@ -202,12 +208,6 @@ class DatasetWrapper:
 def get_activity_data(
     target_chembl_id: str,
     activity_type: str,
-    convert_units: bool = True,
-    duplicate_treatment="median",
-    activity_thresholds: dict[str, float] | None = {
-        "active": 1000,
-        "intermediate": 10000,
-    },
 ) -> pd.DataFrame:
     """
     Fetches and processes activity data from the ChEMBL database for a given target ID and activity type.
@@ -223,25 +223,87 @@ def get_activity_data(
     activity_query = activity_query.filter(standard_type=activity_type)
     activity_df: pd.DataFrame = pd.DataFrame(data=activity_query)
     columns = [
-        "canonical_smiles",
         "molecule_chembl_id",
+        "canonical_smiles",
+        "molecule_pref_name",
+        "target_chembl_id",
+        "target_pref_name",
+        "assay_chembl_id",
+        "assay_description",
         "standard_type",
         "standard_value",
         "standard_units",
-        "assay_description",
     ]
     activity_df = activity_df[columns]
+
+    return activity_df
+
+
+def review_assays(
+    activity_df: pd.DataFrame, assay_keywords: list[str] | None = None
+) -> list[str] | None:
+
+    assay_info = activity_df.loc[["assay_chembl_id", "assay_description"]]
+    print("dataset assays chembl id and description:\n")
+    for index in assay_info.index:
+        print(
+            f"{assay_info.at[index,'assay_chembl_id']}: {assay_info.at[index,'assay_description']}"
+        )
+
+    if assay_keywords != None:
+        pattern = "|".join(assay_keywords)
+        mask = assay_info.loc["assay_description"].str.contains(
+            pattern, case=False, na=False
+        )
+        selected_assays = assay_info[mask]
+        print("keyword filtered assays chembl id and description:\n")
+        for index in selected_assays.index:
+            print(
+                f"{selected_assays.at[index,'assay_chembl_id']}: {selected_assays.at[index,'assay_description']}"
+            )
+        selected_id_list = selected_assays.loc["assay_chembl_id"].to_list() # type: ignore
+        return selected_id_list
+
+
+def filter_by_assay(
+    activity_df: pd.DataFrame,
+    assay_ids: list[str],
+) -> pd.DataFrame:
+
+    print(f"dataframe initial size: {activity_df.shape[0]}")
+    filtered_activity_df = activity_df.loc[
+        activity_df["assay_chembl_id"].isin(assay_ids)
+    ]
+    print(f"dataframe filtered size: {filtered_activity_df.shape[0]}")
+    if filtered_activity_df.empty:
+        print("filtration emptied dataframe, returning original dataframe")
+        return activity_df
+    else:
+        return filtered_activity_df
+
+
+def preprocess_data(
+    activity_df: pd.DataFrame,
+    convert_units: bool = True,
+    assay_ids: list[str] | None = None,
+    duplicate_treatment="median",
+    activity_thresholds: dict[str, float] | None = {
+        "active": 1000,
+        "intermediate": 10000,
+    },
+) -> pd.DataFrame:
     activity_df["standard_value"] = pd.to_numeric(
         arg=activity_df["standard_value"], errors="coerce"
     )
     activity_df = activity_df[activity_df["standard_value"] > 0]
     activity_df = activity_df.dropna()
+    if assay_ids != None:
+        activity_df = filter_by_assay(activity_df=activity_df, assay_ids=assay_ids)
     activity_df = mmm.getLipinskiDescriptors(molecules_df=activity_df)
     activity_df = mmm.getRo5Violations(molecules_df=activity_df)
     if convert_units:
         activity_df = mmm.convert_to_M(molecules_df=activity_df)
-    activity_df = mm.treat_duplicates(activity_df, method=duplicate_treatment)
-    activity_df = activity_df.drop_duplicates("molecule_chembl_id")
+    activity_df = mm.treat_duplicates(molecules_df=activity_df, method=duplicate_treatment)
     activity_df = activity_df.reset_index(drop=True)
     activity_df = mm.normalizeValue(molecules_df=activity_df)
     activity_df = mm.getNegLog(molecules_df=activity_df)
@@ -270,7 +332,7 @@ def calculate_fingerprint(
     fingerprint: str | list[str] = "pubchem",
     scale_features: bool = True,
 ) -> pd.DataFrame:
-
+    # TODO: generalizar para demais descritores
     fingerprint_dict = {
         "atompairs2d": "fingerprint/AtomPairs2DFingerprinter.xml",
         "atompairs2dcount": "fingerprint/AtomPairs2DFingerprintCount.xml",
@@ -429,7 +491,7 @@ class MLConfig:
         if self.algorithm == None:
             print("define algorithm using setup()")
             return
-        if dataset.x_train == None:
+        if dataset.x_train.empty:
             print("dataset empty")
             return
         if (self.algorithm_name == None) and (param_grid == None):
@@ -563,7 +625,7 @@ class MLConfig:
         if self.algorithm == None:
             print("define algorithm using setup()")
             return
-        if dataset.x_train == None:
+        if dataset.x_train.empty:
             print("dataset empty")
             return
         if params != None:
