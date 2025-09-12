@@ -6,7 +6,7 @@ from sklearn.model_selection import train_test_split
 from chembl_webresource_client.new_client import new_client
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import make_scorer
-from sklearn.metrics import root_mean_squared_error
+from sklearn.metrics import root_mean_squared_error  # type: ignore
 from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import r2_score
 from sklearn.metrics import mean_pinball_loss
@@ -18,6 +18,7 @@ from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.ensemble import RandomForestRegressor
 from xgboost import XGBRegressor
 from sklearn_genetic import GASearchCV
+from sklearn_genetic.callbacks import DeltaThreshold
 from sklearn_genetic.space import Categorical
 from sklearn_genetic.space import Continuous
 from sklearn_genetic.space import Integer
@@ -240,28 +241,33 @@ def get_activity_data(
 
 
 def review_assays(
-    activity_df: pd.DataFrame, assay_keywords: list[str] | None = None
+    activity_df: pd.DataFrame, assay_keywords: list[str] | None = None, join="or", n_to_show:int =20
 ) -> list[str] | None:
 
-    assay_info = activity_df.loc[["assay_chembl_id", "assay_description"]]
-    print("dataset assays chembl id and description:\n")
-    for index in assay_info.index:
-        print(
-            f"{assay_info.at[index,'assay_chembl_id']}: {assay_info.at[index,'assay_description']}"
-        )
-
+    assay_info = activity_df.loc[:,["assay_chembl_id", "assay_description"]]
+    unique_assays = len(assay_info.value_counts())
+    print(f"displaying {min(unique_assays,n_to_show)} from {unique_assays} dataset assays chembl id and description. To see more, adjust the 'n_to_show' parameter.\n")
+    
+    print(assay_info.value_counts().head(n=n_to_show))
     if assay_keywords != None:
-        pattern = "|".join(assay_keywords)
-        mask = assay_info.loc["assay_description"].str.contains(
+        if join == "or":
+            pattern = "|".join(assay_keywords)
+        elif join == "and":
+            pattern = "".join([fr"(?=.*{keyword})" for keyword in assay_keywords])
+        else:
+            print(f"Error: Invalid join method '{join}'. Please use 'or' or 'and'.")
+            return None
+        print(f'filtering assays by: {assay_keywords}')
+
+        mask = assay_info.loc[:,"assay_description"].str.contains(
             pattern, case=False, na=False
         )
         selected_assays = assay_info[mask]
         print("keyword filtered assays chembl id and description:\n")
-        for index in selected_assays.index:
-            print(
-                f"{selected_assays.at[index,'assay_chembl_id']}: {selected_assays.at[index,'assay_description']}"
-            )
-        selected_id_list = selected_assays.loc["assay_chembl_id"].to_list() # type: ignore
+        unique_selected_assays = len(selected_assays.value_counts())
+        print(f"displaying {min(unique_selected_assays,n_to_show)} from {unique_selected_assays} dataset assays chembl id and description. To see more, adjust the 'n_to_show' parameter.\n")
+        print(selected_assays.value_counts())
+        selected_id_list = selected_assays.loc[:,"assay_chembl_id"].unique().tolist() # type: ignore
         return selected_id_list
 
 
@@ -303,7 +309,9 @@ def preprocess_data(
     activity_df = mmm.getRo5Violations(molecules_df=activity_df)
     if convert_units:
         activity_df = mmm.convert_to_M(molecules_df=activity_df)
-    activity_df = mm.treat_duplicates(molecules_df=activity_df, method=duplicate_treatment)
+    activity_df = mm.treat_duplicates(
+        molecules_df=activity_df, method=duplicate_treatment
+    )
     activity_df = activity_df.reset_index(drop=True)
     activity_df = mm.normalizeValue(molecules_df=activity_df)
     activity_df = mm.getNegLog(molecules_df=activity_df)
@@ -487,6 +495,7 @@ class MLConfig:
         refit: str,
         population_size: int = 30,
         generations: int = 30,
+        n_jobs=-1,
     ):
         if self.algorithm == None:
             print("define algorithm using setup()")
@@ -596,23 +605,25 @@ class MLConfig:
                 param_grid = param_grids[self.algorithm_name]
             except KeyError as e:
                 print(f"{e}\n\nprovided algorithm_name not available, check docs")
+                return
         try:
-            search_cv_results, best_params, time_to_execute = mlm.evaluate_and_optimize(
-                algorithm=self.algorithm,
+            callback = DeltaThreshold(threshold=0.001, generations=3)
+            param_search = GASearchCV(
+                estimator=self.algorithm,
                 param_grid=param_grid,
-                x_train=dataset.x_train,
-                y_train=dataset.y_train,
                 scoring=self.scoring,
-                algorithm_name=self.algorithm_name,
                 population_size=population_size,
                 generations=generations,
-                refit=refit,
-            )  # TODO: rewrite code directly here from annex file
+                refit=refit, # type: ignore
+                n_jobs=n_jobs,
+                return_train_score=True,
+            )
+            param_search.fit(dataset.x_train, dataset.y_train, callbacks=callback)
         except Exception as e:
             print(f"something went wrong, check error:\n\n{e}")
             return
-        self.params = best_params
-        return search_cv_results, best_params, time_to_execute
+        self.params = param_search.best_params_
+        return param_search
 
     def evaluate_model(
         self,
@@ -649,10 +660,10 @@ class MLConfig:
 
     @staticmethod
     def setup(
-        algorithm_name=None,
-        algorithm=None,
+        algorithm_name: str | None = None,
+        algorithm: BaseEstimator | None = None,
         scoring_names: str | list[str] = ["r2", "rmse", "mae"],
-        scoring=None,
+        scoring: dict | None = None,
         random_state: int = 42,
         **scoring_params,
     ):
