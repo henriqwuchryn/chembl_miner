@@ -2,6 +2,10 @@ import sklearn.model_selection as model_selection
 from sklearn_genetic.callbacks import DeltaThreshold
 from sklearn_genetic import GASearchCV, GAFeatureSelectionCV
 from sklearn_genetic.space import Categorical, Integer, Continuous, Space
+from rdkit import Chem
+from rdkit.Chem import AllChem
+from rdkit.DataStructs import BulkTanimotoSimilarity, CreateFromBitString
+from rdkit.ML.Cluster import Butina
 import numpy as np
 import pandas as pd
 import time
@@ -10,8 +14,8 @@ import os
 
 
 def supervised_outlier_removal(
-    algorithm, x_train, y_train, scoring, algorithm_name, cv=10
-):
+    algorithm, x_train, y_train, scoring, algorithm_name, cv=10,
+    ):
     cv_results = model_selection.cross_validate(
         estimator=algorithm,
         X=x_train,
@@ -22,7 +26,7 @@ def supervised_outlier_removal(
         return_estimator=True,
         return_indices=True,
         return_train_score=True,
-    )
+        )
     residues = pd.Series().astype(float)
 
     for fold in range(cv):
@@ -50,7 +54,7 @@ def evaluate_and_optimize(
     population_size=30,
     generations=30,
     refit="r2",
-):
+    ):
     start_time = time.time()
     print(f"\nOptimizing {algorithm_name}")
     print(f"Parameters: {describe_params(param_grid)}")
@@ -63,7 +67,7 @@ def evaluate_and_optimize(
         refit=refit,
         n_jobs=-1,
         return_train_score=True,
-    )
+        )
     print("\nFitting")
     callback = DeltaThreshold(threshold=0.001, generations=3)
     param_search.fit(x_train, y_train, callbacks=callback)
@@ -86,7 +90,7 @@ def genetic_feature_selection(
     population_size=30,
     generations=30,
     refit="r2",
-):
+    ):
     start_time = time.time()
     print(f"\nSelecting features for {algorithm_name}")
     feature_selection = GAFeatureSelectionCV(
@@ -97,7 +101,7 @@ def genetic_feature_selection(
         refit=refit,
         n_jobs=-1,
         return_train_score=True,
-    )
+        )
     print("\nFitting")
     callback = DeltaThreshold(threshold=0.001, generations=3)
     feature_selection.fit(x_train, y_train, callback)
@@ -146,13 +150,13 @@ def get_results(cv_results, name=""):
         r2_train_std = cv_results["train_r2"].std()
         r2_df = pd.DataFrame(
             {
-                "test_mean": r2_test_mean,
-                "test_std": r2_test_std,
+                "test_mean" : r2_test_mean,
+                "test_std"  : r2_test_std,
                 "train_mean": r2_train_mean,
-                "train_std": r2_train_std,
-            },
+                "train_std" : r2_train_std,
+                },
             index=[f"r2{name}"],
-        )
+            )
         score_dfs.extend(r2_df)
     except KeyError as e:
         print("Not available: r2")
@@ -164,13 +168,13 @@ def get_results(cv_results, name=""):
         rmse_train_std = cv_results["train_rmse"].std()
         rmse_df = pd.DataFrame(
             {
-                "test_mean": rmse_test_mean,
-                "test_std": rmse_test_std,
+                "test_mean" : rmse_test_mean,
+                "test_std"  : rmse_test_std,
                 "train_mean": rmse_train_mean,
-                "train_std": rmse_train_std,
-            },
+                "train_std" : rmse_train_std,
+                },
             index=[f"rmse{name}"],
-        )
+            )
         score_dfs.extend(rmse_df)
     except KeyError as e:
         print("Not available: rmse")
@@ -182,13 +186,13 @@ def get_results(cv_results, name=""):
         mae_train_std = cv_results["train_mae"].std()
         mae_df = pd.DataFrame(
             {
-                "test_mean": mae_test_mean,
-                "test_std": mae_test_std,
+                "test_mean" : mae_test_mean,
+                "test_std"  : mae_test_std,
                 "train_mean": mae_train_mean,
-                "train_std": mae_train_std,
-            },
+                "train_std" : mae_train_std,
+                },
             index=[f"mae{name}"],
-        )
+            )
         score_dfs.extend(mae_df)
     except KeyError as e:
         print("Not available: mae")
@@ -200,14 +204,57 @@ def get_results(cv_results, name=""):
         quantile_train_std = cv_results["train_quantile"].std()
         quantile_df = pd.DataFrame(
             {
-                "test_mean": quantile_test_mean,
-                "test_std": quantile_test_std,
+                "test_mean" : quantile_test_mean,
+                "test_std"  : quantile_test_std,
                 "train_mean": quantile_train_mean,
-                "train_std": quantile_train_std,
-            },
+                "train_std" : quantile_train_std,
+                },
             index=[f"quantile{name}"],
-        )
+            )
         score_dfs.extend(quantile_df)
     except KeyError as e:
         print("Not available: quantile")
     return score_dfs
+
+
+def _df_to_bitvect_list(df: pd.DataFrame):
+    bit_strings = df.apply(lambda row: ''.join(row.astype(str)), axis=1)
+    return [CreateFromBitString(bs) for bs in bit_strings]
+
+
+def scaffold_split(
+    activity_df: pd.DataFrame,
+    smiles_col: str = 'canonical_smiles',
+    test_size: float = 0.2,
+    similarity_cutoff: float = 0.7,
+    ) -> tuple[pd.Index, pd.Index]:
+    """
+    Splits a DataFrame into train and test sets based on structural similarity
+    using the Butina clustering algorithm.
+    """
+    print("\n--- Performing structural split ---")
+    mols = [Chem.MolFromSmiles(smi) for smi in activity_df[smiles_col]]
+    fps = [AllChem.GetMorganFingerprintAsBitVect(m, 2, nBits=1024) for m in mols]
+    dists = []
+    n_mols = len(fps)
+    for i in range(1, n_mols):
+        sims = BulkTanimotoSimilarity(fps[i], fps[:i])
+        dists.extend([1 - s for s in sims])
+
+    clusters = Butina.ClusterData(dists, n_mols, 1.0 - similarity_cutoff, isDistData=True)
+    clusters = sorted(clusters, key=len, reverse=True)
+
+    train_indices, test_indices = [], []
+    for cluster in clusters:
+        if len(test_indices) + len(cluster) <= int(n_mols * test_size):
+            test_indices.extend(cluster)
+        else:
+            train_indices.extend(cluster)
+
+    train_df_indices = activity_df.index[train_indices]
+    test_df_indices = activity_df.index[test_indices]
+
+    print(f"Clustered {n_mols} molecules into {len(clusters)} clusters.")
+    print(f"Train set size: {len(train_df_indices)}, Test set size: {len(test_df_indices)}")
+
+    return train_df_indices, test_df_indices
