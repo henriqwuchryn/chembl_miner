@@ -28,6 +28,10 @@ import molecules_manipulation_methods as mmm
 import miscelanneous_methods as mm
 
 
+def _print(str:str,verbosity:bool) -> None:
+    if verbosity:
+        print(str)
+
 class DatasetWrapper:
 
     def __init__(
@@ -241,33 +245,62 @@ def get_activity_data(
 
 
 def review_assays(
-    activity_df: pd.DataFrame, assay_keywords: list[str] | None = None, join="or", n_to_show:int =20
+    activity_df: pd.DataFrame,
+    assay_keywords: list[str] | None = None,
+    exclude_keywords: bool=False,
+    inner_join: bool=False,
+    max_entries: int = 20,
 ) -> list[str] | None:
+    """
+    Reviews, displays, and filters assays from an activity DataFrame.
 
-    assay_info = activity_df.loc[:,["assay_chembl_id", "assay_description"]]
+    Can either include or exclude assays based on keywords found in the
+    'assay_description' column.
+
+    Args:
+        activity_df (pd.DataFrame): DataFrame containing activity data with
+                                    "assay_chembl_id" and "assay_description" columns.
+        assay_keywords (list[str] | None): A list of keywords to filter
+                                           assays by. Defaults to None.
+        exclude_keywords (bool):Use the keywords for exclusion insted of inclusion.
+                                Defaults to False.
+        inner_join (bool): Use inner join instead of outer.
+                           Defaults to False.
+        max_entries (int): The number of top assays to display. Defaults to 20.
+
+    Returns:
+        List[str] | None: A list of selected assay ChEMBL IDs, or None if no
+                          keywords are provided or an error occurs.
+    """
+    assay_info = activity_df.loc[:, ["assay_chembl_id", "assay_description"]]
     unique_assays = len(assay_info.value_counts())
-    print(f"displaying {min(unique_assays,n_to_show)} from {unique_assays} dataset assays chembl id and description. To see more, adjust the 'n_to_show' parameter.\n")
-    
-    print(assay_info.value_counts().head(n=n_to_show))
-    if assay_keywords != None:
-        if join == "or":
-            pattern = "|".join(assay_keywords)
-        elif join == "and":
-            pattern = "".join([fr"(?=.*{keyword})" for keyword in assay_keywords])
-        else:
-            print(f"Error: Invalid join method '{join}'. Please use 'or' or 'and'.")
-            return None
-        print(f'filtering assays by: {assay_keywords}')
+    print(f"Displaying {min(unique_assays, max_entries)} of {unique_assays} total unique assays.")
+    print("To see more, adjust the 'max_entries' parameter.\n")
+    pd.set_option("display.max_rows", max_entries)
+    print(assay_info.value_counts().head(n=max_entries))
 
-        mask = assay_info.loc[:,"assay_description"].str.contains(
+    if assay_keywords == None:
+        return None
+    else:
+        if inner_join:
+            pattern = "".join([rf"(?=.*{keyword})" for keyword in assay_keywords])
+        else:
+            pattern = "|".join(assay_keywords)
+        print(f"\nfiltering assays by: {assay_keywords}")
+        print(f"exclude keywords: {exclude_keywords}")
+        print(f"inner join : {inner_join}")
+
+        mask = assay_info.loc[:, "assay_description"].str.contains(
             pattern, case=False, na=False
         )
-        selected_assays = assay_info[mask]
-        print("keyword filtered assays chembl id and description:\n")
+        if exclude_keywords:
+            selected_assays = assay_info[~mask]
+        else:
+            selected_assays = assay_info[mask]
         unique_selected_assays = len(selected_assays.value_counts())
-        print(f"displaying {min(unique_selected_assays,n_to_show)} from {unique_selected_assays} dataset assays chembl id and description. To see more, adjust the 'n_to_show' parameter.\n")
-        print(selected_assays.value_counts())
-        selected_id_list = selected_assays.loc[:,"assay_chembl_id"].unique().tolist() # type: ignore
+        print(f"Displaying {min(unique_selected_assays, max_entries)} of {unique_selected_assays} filtered assays.\n")
+        print(selected_assays.value_counts().head(n=max_entries))
+        selected_id_list = selected_assays.loc[:, "assay_chembl_id"].unique().tolist()  # type: ignore
         return selected_id_list
 
 
@@ -275,7 +308,11 @@ def filter_by_assay(
     activity_df: pd.DataFrame,
     assay_ids: list[str],
 ) -> pd.DataFrame:
+    """
 
+    Returns:
+        pd.DataFrame:
+    """
     print(f"dataframe initial size: {activity_df.shape[0]}")
     filtered_activity_df = activity_df.loc[
         activity_df["assay_chembl_id"].isin(assay_ids)
@@ -302,7 +339,7 @@ def preprocess_data(
         arg=activity_df["standard_value"], errors="coerce"
     )
     activity_df = activity_df[activity_df["standard_value"] > 0]
-    activity_df = activity_df.dropna()
+    activity_df = activity_df.dropna(subset=['canonical_smiles','standard_value'])
     if assay_ids != None:
         activity_df = filter_by_assay(activity_df=activity_df, assay_ids=assay_ids)
     activity_df = mmm.getLipinskiDescriptors(molecules_df=activity_df)
@@ -614,7 +651,7 @@ class MLConfig:
                 scoring=self.scoring,
                 population_size=population_size,
                 generations=generations,
-                refit=refit, # type: ignore
+                refit=refit,  # type: ignore
                 n_jobs=n_jobs,
                 return_train_score=True,
             )
