@@ -1,36 +1,36 @@
 import os
-import pickle
-import pandas as pd
+
 import numpy as np
-from sklearn.model_selection import train_test_split
+import pandas as pd
 from chembl_webresource_client.new_client import new_client
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import make_scorer
-from sklearn.metrics import root_mean_squared_error  # type: ignore
-from sklearn.metrics import mean_absolute_error
-from sklearn.metrics import r2_score
-from sklearn.metrics import mean_pinball_loss
 from sklearn.base import BaseEstimator
 from sklearn.ensemble import BaggingRegressor
 from sklearn.ensemble import ExtraTreesRegressor
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.ensemble import RandomForestRegressor
-from xgboost import XGBRegressor
+from sklearn.metrics import make_scorer
+from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_pinball_loss
+from sklearn.metrics import r2_score
+from sklearn.metrics import root_mean_squared_error  # type: ignore
+from sklearn.model_selection import cross_validate
+from sklearn.model_selection import train_test_split
 from sklearn_genetic import GASearchCV
 from sklearn_genetic.callbacks import DeltaThreshold
 from sklearn_genetic.space import Categorical
 from sklearn_genetic.space import Continuous
 from sklearn_genetic.space import Integer
-from sklearn.model_selection import cross_validate
+from xgboost import XGBRegressor
+
 import machine_learning_methods as mlm
-import molecules_manipulation_methods as mmm
 import miscelanneous_methods as mm
+import molecules_manipulation_methods as mmm
 
 
-def _print(str: str, verbosity: bool) -> None:
+def _print(input_string: str, verbosity: bool) -> None:
     if verbosity:
-        print(str)
+        print(input_string)
 
 
 class DatasetWrapper:
@@ -57,27 +57,56 @@ class DatasetWrapper:
         self.y_preprocessing = y_preprocessing
 
 
-    def subset_general_data(self, subset="train") -> pd.DataFrame:
+    @classmethod
+    def from_path(cls, file_path):
+        instance = cls()
+        instance.load(file_path=file_path)
+        return instance
+
+
+    @classmethod
+    def from_dataframe(
+        cls,
+        full_df: pd.DataFrame,
+        target_column: str,
+        nonfeature_columns,
+        use_structural_split: bool,
+        holdout_size: float,
+        random_state: int,
+        preprocessing_size: int,
+        ):
+        instance = cls()
+        instance._load_unsplit_dataframe(
+            full_df=full_df,
+            target_column=target_column,
+            nonfeature_columns=nonfeature_columns,
+            use_structural_split=use_structural_split,
+            holdout_size=holdout_size,
+            random_state=random_state,
+            preprocessing_size=preprocessing_size,
+            )
+        return instance
+
+
+    def subset_general_data(self, train_subset: bool = True) -> pd.DataFrame:
         """
         Retrieves the corresponding rows from general_data for the train or test dataset.
 
         Args:
-            subset (str): 'train' or 'test', indicating which subset to trace. Default value is 'train'.
+            train_subset (bool): Indicates whether to subset train or test values. Default value is True.
 
         Returns:
             pd.DataFrame: Rows from general_data corresponding to the specified subset.
         """
-        if subset == "train":
+        if train_subset:
             return self.general_data.loc[self.x_train.index]
-        elif subset == "test":
-            return self.general_data.loc[self.x_test.index]
         else:
-            raise ValueError("Subset must be 'train' or 'test'.")
+            return self.general_data.loc[self.x_test.index]
 
 
     def save(self, file_path) -> None:
         """
-        Saves the entire dataset to CSV files.
+        Saves the entire dataset to CSV files inside file_path folder.
         """
 
         if not os.path.exists(file_path):
@@ -90,12 +119,12 @@ class DatasetWrapper:
         self.y_test.to_csv(f"{file_path}/tte.csv", index_label="index")
         self.x_preprocessing.to_csv(f"{file_path}/fpr.csv", index_label="index")
         self.y_preprocessing.to_csv(f"{file_path}/tpr.csv", index_label="index")
-        print(f"Dataset saved to {file_path}")
+        print(f"Dataset saved to {file_path} folder")
 
 
     def load(self, file_path) -> None:
         """
-        Loads the dataset from CSV files.
+        Loads the dataset from CSV files inside file_path folder.
         """
         try:
             self.general_data = pd.read_csv(f"{file_path}/gd.csv", index_col="index")
@@ -115,14 +144,13 @@ class DatasetWrapper:
                 f"{file_path}/tpr.csv",
                 index_col="index",
                 )["neg_log_value"]
-            self.file_path = file_path
             print(f"Dataset loaded from {file_path}")
         except Exception as e:
             print(e)
             print("Dataset loading failed")
 
 
-    def load_unsplit_dataframe(
+    def _load_unsplit_dataframe(
         self,
         full_df: pd.DataFrame,
         target_column: str,
@@ -137,11 +165,13 @@ class DatasetWrapper:
         general_data, x_train/test, and y_train/test.
 
         Args:
-            dataframe (pandas.DataFrame): Unsplit dataframe containing the dataset.
-            general_columns (list): List of columns representing general data.
+            full_df (pandas.DataFrame): Unsplit dataframe containing the dataset.
             target_column (str): Column name representing the target variable.
+            nonfeature_columns: Columns representing nonfeature variables.
+            use_structural_split (bool): Whether to use structural splitting or not.
             holdout_size (float): Proportion of the dataset to include in the test split. Standard value = 0.2.
             random_state (int): Random state for reproducibility. Standard value = 42.
+            preprocessing_size (int): Maximum size of preprocessing dataset.
         """
         self.general_data = full_df[nonfeature_columns]
         features = full_df.drop(columns=nonfeature_columns)
@@ -164,13 +194,13 @@ class DatasetWrapper:
                 )
         print(f"Unsplit dataset loaded and split into train/test sets")
         # Create preprocessing dataset
-        self.create_preprocessing_dataset(
+        self._create_preprocessing_dataset(
             random_state=random_state,
             preprocessing_size=preprocessing_size,
             )
 
 
-    def create_preprocessing_dataset(
+    def _create_preprocessing_dataset(
         self,
         random_state,
         preprocessing_size=7500,
@@ -181,7 +211,8 @@ class DatasetWrapper:
         Otherwise, it uses the entire train dataset.
 
         Args:
-            max_samples (int): Number of samples to use for preprocessing if the train dataset is large.
+            random_state (int): Random state to use for splitting the dataset.
+            preprocessing_size (int): Number of samples to use for preprocessing if the train dataset is large.
         """
         if len(self.x_train) > preprocessing_size:
             self.x_preprocessing = self.x_train.sample(
@@ -211,35 +242,6 @@ class DatasetWrapper:
                 )
 
 
-    @staticmethod
-    def load_dataset(file_path):
-        instance = DatasetWrapper()
-        instance.load(file_path=file_path)
-        return instance
-
-
-    @staticmethod
-    def load_unsplit_dataset(
-        full_df: pd.DataFrame,
-        target_column: str,
-        nonfeature_columns,
-        use_structural_split: bool,
-        holdout_size: float,
-        random_state: int,
-        preprocessing_size: int,
-        ):
-        instance = DatasetWrapper()
-        instance.load_unsplit_dataframe(
-            full_df=full_df,
-            target_column=target_column,
-            nonfeature_columns=nonfeature_columns,
-            use_structural_split=use_structural_split,
-            holdout_size=holdout_size,
-            random_state=random_state,
-            preprocessing_size=preprocessing_size,
-            )
-        return instance
-
 
 def get_activity_data(
     target_chembl_id: str,
@@ -250,7 +252,6 @@ def get_activity_data(
     Args:
         target_chembl_id (str): The ChEMBL ID of the target.
         activity_type (str): The type of activity to filter results by.
-        convert_units (int): Whether to convert units to mol/L (1 for yes, 0 for no).
     Returns:
         dataset (pd.DataFrame): A dataframe object containing the processed dataset.
     """
@@ -277,13 +278,13 @@ def get_activity_data(
 
 def review_assays(
     activity_df: pd.DataFrame,
+    max_entries: int = 20,
     assay_keywords: list[str] | None = None,
     exclude_keywords: bool = False,
     inner_join: bool = False,
-    max_entries: int = 20,
     ) -> list[str] | None:
     """
-    Reviews, displays, and filters assays from an activity DataFrame.
+    Displays and filter assays from an activity DataFrame.
 
     Can either include or exclude assays based on keywords found in the
     'assay_description' column.
@@ -291,13 +292,13 @@ def review_assays(
     Args:
         activity_df (pd.DataFrame): DataFrame containing activity data with
                                     "assay_chembl_id" and "assay_description" columns.
+        max_entries (int): The number of top assays to display. Defaults to 20.
         assay_keywords (list[str] | None): A list of keywords to filter
                                            assays by. Defaults to None.
-        exclude_keywords (bool):Use the keywords for exclusion insted of inclusion.
+        exclude_keywords (bool):Use the keywords for exclusion instead of inclusion.
                                 Defaults to False.
-        inner_join (bool): Use inner join instead of outer.
+        inner_join (bool): Use inner join instead of outer (AND instead of OR).
                            Defaults to False.
-        max_entries (int): The number of top assays to display. Defaults to 20.
 
     Returns:
         List[str] | None: A list of selected assay ChEMBL IDs, or None if no
@@ -312,7 +313,7 @@ def review_assays(
     pd.set_option("display.max_rows", max_entries)
     print(assay_info.value_counts().head(n=max_entries))
 
-    if assay_keywords == None:
+    if assay_keywords is None:
         return None
     else:
         if inner_join:
@@ -346,6 +347,10 @@ def filter_by_assay(
     assay_ids: list[str],
     ) -> pd.DataFrame:
     """
+    Filters an activity DataFrame by 'assay_description' column using provided assay_ids.
+    Args:
+        activity_df (pd.DataFrame): DataFrame containing ChEMBL activity data.
+        assay_ids (list[str]): list of assay_chembl_ids obtained from the review_assays function.
 
     Returns:
         pd.DataFrame:
@@ -377,21 +382,21 @@ def preprocess_data(
         errors="coerce",
         )
     activity_df = activity_df[activity_df["standard_value"] > 0]
-    activity_df = activity_df.dropna(subset=["canonical_smiles", "standard_value"])
-    if assay_ids != None:
+    activity_df = activity_df.dropna(subset=["molecule_chembl_id", "canonical_smiles", "standard_value"])
+    if assay_ids is not None:
         activity_df = filter_by_assay(activity_df=activity_df, assay_ids=assay_ids)
-    activity_df = mmm.getLipinskiDescriptors(molecules_df=activity_df)
-    activity_df = mmm.getRo5Violations(molecules_df=activity_df)
+    activity_df = mmm.get_lipinski_descriptors(molecules_df=activity_df)
+    activity_df = mmm.get_ro5_violations(molecules_df=activity_df)
     if convert_units:
-        activity_df = mmm.convert_to_M(molecules_df=activity_df)
+        activity_df = mmm.convert_to_m(molecules_df=activity_df)
     activity_df = mm.treat_duplicates(
         molecules_df=activity_df,
         method=duplicate_treatment,
         )
+    activity_df = mm.normalize_value(molecules_df=activity_df)
+    activity_df = mm.get_neg_log(molecules_df=activity_df)
     activity_df = activity_df.reset_index(drop=True)
-    activity_df = mm.normalizeValue(molecules_df=activity_df)
-    activity_df = mm.getNegLog(molecules_df=activity_df)
-    if activity_thresholds != None:
+    if activity_thresholds is not None:
         bioactivity_class = []
         sorted_thresholds = sorted(
             activity_thresholds.items(),
@@ -399,10 +404,10 @@ def preprocess_data(
             )
 
         for i in activity_df.standard_value:
-            value_nM = float(i) * 1e9  # mol/l to nmol/L
+            value_nm = float(i) * 1e9  # mol/l to n mol/L
             assigned_class = "inactive"
             for class_name, threshold_nM in sorted_thresholds:
-                if value_nM <= threshold_nM:
+                if value_nm <= threshold_nM:
                     assigned_class = class_name
                     break
             bioactivity_class.append(assigned_class)
@@ -465,9 +470,10 @@ def assemble_dataset(
     ) -> DatasetWrapper:
     nonfeature_columns = activity_df.columns
     dataset_df = pd.concat([activity_df, descriptors_df], axis=1)
-    dataset_df.replace([np.inf, -np.inf], np.nan, inplace=True)
-    dataset_df.dropna(inplace=True)
-    dataset = DatasetWrapper.load_unsplit_dataset(
+    dataset_df = dataset_df.replace([np.inf, -np.inf], np.nan)
+    essential_cols = list(descriptors_df.columns) + [target_column, "canonical_smiles"]
+    dataset_df = dataset_df.dropna(subset=essential_cols)
+    dataset = DatasetWrapper.from_dataframe(
         full_df=dataset_df,
         target_column=target_column,
         nonfeature_columns=nonfeature_columns,
@@ -504,19 +510,21 @@ class MLConfig:
         alpha: float,
         ) -> None:
 
-        if scoring == None:
+        if scoring is None:
             scoring_dict: dict = {
                 "r2"      : make_scorer(r2_score),
                 "rmse"    : make_scorer(
                     lambda y_true, y_pred: root_mean_squared_error(y_true, y_pred),
+                    greater_is_better=False
                     ),
-                "mae"     : make_scorer(mean_absolute_error),
+                "mae"     : make_scorer(mean_absolute_error,greater_is_better=False),
                 "quantile": make_scorer(
                     lambda y_true, y_pred: mean_pinball_loss(
                         y_true,
                         y_pred,
                         alpha=alpha,
                         ),
+                    greater_is_better=False
                     ),
                 }
             scoring: dict = {}
@@ -526,16 +534,14 @@ class MLConfig:
                 try:
                     metric = scoring_dict[i]
                     scoring[i] = metric
-                    return
                 except KeyError as e:
                     print(f"{i} is not available as a scoring metric")
                     print(e)
-                    return
         else:
             print(
                 "package functionality might not work properly with external scoring functions",
                 )
-            self.scoring = scoring
+        self.scoring = scoring
 
 
     def set_algorithm(
@@ -545,8 +551,8 @@ class MLConfig:
         random_state: int,
         ) -> None:
 
-        if algorithm == None:
-            if algorithm_name == None:
+        if algorithm is None:
+            if algorithm_name is None:
                 print("please, provide an algorithm_name or algorithm object")
             algorithms: dict = {
                 "bagging_reg"      : BaggingRegressor(random_state=random_state),
@@ -580,19 +586,19 @@ class MLConfig:
         generations: int = 30,
         n_jobs=-1,
         ):
-        if self.algorithm == None:
+        if self.algorithm is None:
             print("define algorithm using setup()")
-            return
+            return None
         if dataset.x_train.empty:
             print("dataset empty")
-            return
-        if (self.algorithm_name == None) and (param_grid == None):
+            return None
+        if (self.algorithm_name is None) and (param_grid is None):
             print(
                 "param_grid not provided. provide a param_grid compatible with sklearn_genetic (https://sklearn-genetic-opt.readthedocs.io/en/stable/api/space.html)\nalternatively, provide algorithm_name, to use one of the param_grids provided",
                 )
-            return
+            return None
 
-        if param_grid == None:
+        if param_grid is None:
             param_grids: dict = {
                 "bagging_reg"      : {
                     "n_estimators"      : Integer(lower=10, upper=1000),  # 10
@@ -695,7 +701,7 @@ class MLConfig:
                 param_grid = param_grids[self.algorithm_name]
             except KeyError as e:
                 print(f"{e}\n\nprovided algorithm_name not available, check docs")
-                return
+                return None
         try:
             callback = DeltaThreshold(threshold=0.001, generations=3)
             param_search = GASearchCV(
@@ -711,7 +717,7 @@ class MLConfig:
             param_search.fit(dataset.x_train, dataset.y_train, callbacks=callback)
         except Exception as e:
             print(f"something went wrong, check error:\n\n{e}")
-            return
+            return None
         self.params = param_search.best_params_
         return param_search
 
@@ -724,15 +730,15 @@ class MLConfig:
         n_jobs=-1,
         ):
 
-        if self.algorithm == None:
+        if self.algorithm is None:
             print("define algorithm using setup()")
-            return
+            return None
         if dataset.x_train.empty:
             print("dataset empty")
-            return
-        if params != None:
+            return None
+        if params is not None:
             algorithm = self.algorithm.set_params(**params)
-        elif self.params != None:
+        elif self.params is not None:
             algorithm = self.algorithm.set_params(**self.params)
         else:
             algorithm = self.algorithm
@@ -759,11 +765,11 @@ class MLConfig:
         random_state: int = 42,
         **scoring_params,
         ):
-        if (algorithm_name == None) and (algorithm == None):
+        if (algorithm_name is None) and (algorithm is None):
             print(
                 "you must select an algorithm_name from the docs or provide an algorithm object",
                 )
-            return
+            return None
 
         instance = MLConfig()
         instance.set_algorithm(
@@ -777,10 +783,10 @@ class MLConfig:
             alpha = scoring_params["alpha"]
             if type(alpha) != float:
                 print("alpha must be a float between 0 and 1")
-                return
+                return None
             elif not 0 < alpha < 1:
                 print("alpha must be between 0 and 1")
-                return
+                return None
         else:
             alpha: float = 0.5
 
