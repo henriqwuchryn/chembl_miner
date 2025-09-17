@@ -41,15 +41,15 @@ activity_df = activity_df[
 activity_df['standard_value'] = pd.to_numeric(activity_df['standard_value'], errors='coerce')
 activity_df = activity_df[activity_df['standard_value'] > 0]                        
 activity_df = activity_df.dropna().drop_duplicates("canonical_smiles").reset_index(drop=True)
-activity_df = mmm.getLipinskiDescriptors(activity_df)
-activity_df = mmm.getRo5Violations(activity_df)
+activity_df = mmm.get_lipinski_descriptors(activity_df)
+activity_df = mmm.get_ro5_violations(activity_df)
 
 if will_convert == 1:
     print('\nConverting units to mol/L')
-    activity_df = mmm.convert_to_M(activity_df)
+    activity_df = mmm.convert_to_m(activity_df)
 
-activity_df = mm.normalizeValue(activity_df)
-activity_df = mm.getNegLog(activity_df)
+activity_df = mm.normalize_value(activity_df)
+activity_df = mm.get_neg_log(activity_df)
 bioactivity_class =[]
 
 for i in activity_df.standard_value:

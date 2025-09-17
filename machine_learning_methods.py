@@ -1,16 +1,15 @@
-import sklearn.model_selection as model_selection
-from sklearn_genetic.callbacks import DeltaThreshold
-from sklearn_genetic import GASearchCV, GAFeatureSelectionCV
-from sklearn_genetic.space import Categorical, Integer, Continuous, Space
-from rdkit import Chem
-from rdkit.Chem import AllChem
-from rdkit.DataStructs import BulkTanimotoSimilarity, CreateFromBitString
-from rdkit.ML.Cluster import Butina
+import time
+
 import numpy as np
 import pandas as pd
-import time
-import miscelanneous_methods as mm
-import os
+import sklearn.model_selection as model_selection
+from rdkit import Chem
+from rdkit.Chem.rdFingerprintGenerator import GetMorganGenerator
+from rdkit.DataStructs import BulkTanimotoSimilarity, CreateFromBitString
+from rdkit.ML.Cluster import Butina
+from sklearn_genetic import GASearchCV, GAFeatureSelectionCV
+from sklearn_genetic.callbacks import DeltaThreshold
+from sklearn_genetic.space import Categorical
 
 
 def supervised_outlier_removal(
@@ -227,34 +226,45 @@ def scaffold_split(
     smiles_col: str = 'canonical_smiles',
     test_size: float = 0.2,
     similarity_cutoff: float = 0.7,
+    radius: int = 2,
+    fingerprint_n_bits: int = 1024,
     ) -> tuple[pd.Index, pd.Index]:
     """
     Splits a DataFrame into train and test sets based on structural similarity
     using the Butina clustering algorithm.
     """
     print("\n--- Performing structural split ---")
-    mols = [Chem.MolFromSmiles(smi) for smi in activity_df[smiles_col]]
-    fps = [AllChem.GetMorganFingerprintAsBitVect(m, 2, nBits=1024) for m in mols]
-    dists = []
-    n_mols = len(fps)
-    for i in range(1, n_mols):
-        sims = BulkTanimotoSimilarity(fps[i], fps[:i])
-        dists.extend([1 - s for s in sims])
+    molecules: list = []
+    for smiles in activity_df[smiles_col]:
+        molecules.append(Chem.MolFromSmiles(smiles))
+    fingerprint_generator = GetMorganGenerator(radius=radius, fpSize=fingerprint_n_bits)
+    fingerprints: tuple = fingerprint_generator.GetFingerprints(molecules)
+    distances = []
+    n_mols = len(fingerprints)
+    for i in range(n_mols):
+        similarity_values = BulkTanimotoSimilarity(fingerprints[i], fingerprints[:i])
+        distances.extend([1 - value for value in similarity_values])
+    clusters: tuple[tuple] = Butina.ClusterData(distances, n_mols, 1.0 - similarity_cutoff, isDistData=True)
+    clusters: list[tuple] = sorted(clusters, key=len, reverse=True)
+    test_indices: list = []
+    train_indices: list = []
+    train_target = n_mols * (1 - test_size)
+    test_target = n_mols * test_size
 
-    clusters = Butina.ClusterData(dists, n_mols, 1.0 - similarity_cutoff, isDistData=True)
-    clusters = sorted(clusters, key=len, reverse=True)
-
-    train_indices, test_indices = [], []
     for cluster in clusters:
-        if len(test_indices) + len(cluster) <= int(n_mols * test_size):
+        # Assign cluster to the set that is further from its target size
+        train_need = len(train_indices) / train_target
+        test_need = len(test_indices) / test_target
+
+        if train_need >= test_need:
             test_indices.extend(cluster)
         else:
             train_indices.extend(cluster)
 
     train_df_indices = activity_df.index[train_indices]
     test_df_indices = activity_df.index[test_indices]
-
     print(f"Clustered {n_mols} molecules into {len(clusters)} clusters.")
-    print(f"Train set size: {len(train_df_indices)}, Test set size: {len(test_df_indices)}")
+    print(f"Train set size: {len(train_df_indices)}, Test set size: {len(test_df_indices)}.")
+    print(f"Effective holdout ratio: {round(len(test_df_indices) / (len(test_df_indices) + len(train_df_indices)), 4)}")
 
     return train_df_indices, test_df_indices

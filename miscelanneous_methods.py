@@ -19,12 +19,13 @@ def generate_unique_filename(base_path, base_name, tag_one='', tag_two='', suffi
         counter += 1
 
 
-def check_if_int (input, default_output=0):
-  """will check if input can be parsed as an integer. if so, will return the integer, and if not, will return defaul_output"""
+def check_if_int (input_string, default_output=0):
+  """will check if input can be parsed as an integer. if so, will return the integer, and if not, will return default_output"""
   try:
-    output = int(input)
+    output = int(input_string)
     return output
-  except:
+  except TypeError as e:
+    print(e,'\n','could not convert input to integer, returning default output = 0')
     output = default_output
     return output
 
@@ -35,7 +36,7 @@ def remove_low_variance_columns(input_data, threshold=0.1):
     return input_data[input_data.columns[selection.get_support(indices=True)]]
 
 
-def normalizeValue(molecules_df):
+def normalize_value(molecules_df):
     norm = []
     molecules_df_norm = molecules_df
 
@@ -48,7 +49,7 @@ def normalizeValue(molecules_df):
     return molecules_df_norm
 
 
-def getNegLog(molecules_df):
+def get_neg_log(molecules_df):
     neg_log = []
     molecules_df_neg_log = molecules_df
 
@@ -82,7 +83,7 @@ def mannwhitney_test(col_name:str, molecules_df1, molecules_df2, alpha:float=0.0
   return results
 
 
-def treat_duplicates(molecules_df, method = 'median', reset_index: bool=True) -> pd.DataFrame:
+def treat_duplicates(molecules_df, method: str = 'median') -> pd.DataFrame:
   """
   Resolves duplicate molecule entries by applying an aggregation method to their
   'standard_value' and then dropping duplicates.
@@ -97,10 +98,9 @@ def treat_duplicates(molecules_df, method = 'median', reset_index: bool=True) ->
   """
   print(f"Initial DataFrame size: {molecules_df.shape[0]}")
   treated_molecules_df = molecules_df.copy()
+  # noinspection PyTypeChecker
   transformed_values = treated_molecules_df.groupby('molecule_chembl_id')['standard_value'].transform(method)
   treated_molecules_df.loc['standard_value'] = transformed_values
   treated_molecules_df = treated_molecules_df.drop_duplicates(subset='molecule_chembl_id')
-  if reset_index:
-    treated_molecules_df.reset_index(drop=True)
   print(f"Filtered DataFrame size: {treated_molecules_df.shape[0]}")
   return treated_molecules_df
