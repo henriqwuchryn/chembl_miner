@@ -14,6 +14,7 @@ from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import mean_pinball_loss
 from sklearn.metrics import r2_score
 from sklearn.metrics import root_mean_squared_error  # type: ignore
+from sklearn.metrics._scorer import _BaseScorer
 from sklearn.model_selection import cross_validate
 from sklearn.model_selection import train_test_split
 from sklearn_genetic import GASearchCV
@@ -26,6 +27,7 @@ from xgboost import XGBRegressor
 import machine_learning_methods as mlm
 import miscelanneous_methods as mm
 import molecules_manipulation_methods as mmm
+
 
 # TODO: fix imports everywhere; migrate functions from another files here with leading underscore
 def _print(input_string: str, verbosity: bool) -> None:
@@ -240,7 +242,6 @@ class DatasetWrapper:
             print(
                 "This dataset contains a preprocessing subset of 7500 samples for hyperparameter optimization and feature selection",
                 )
-
 
 
 def get_activity_data(
@@ -486,16 +487,18 @@ def assemble_dataset(
     return dataset
 
 
-class MLConfig:
+class MLWrapper:
 
     def __init__(
         self,
         algorithm_name: str | None = None,
         algorithm: BaseEstimator | None = None,
-        scoring: dict | None = None,
+        fit_model: BaseEstimator | None = None,
+        scoring: dict = {},
         param_grid: dict = {},
         params: dict = {},
         ):
+        self.fit_model = fit_model
         self.algorithm_name = algorithm_name
         self.algorithm = algorithm
         self.scoring = scoring
@@ -503,103 +506,65 @@ class MLConfig:
         self.params = params
 
 
-    def set_scoring(
-        self,
-        scoring_names: str | list[str],
-        scoring: dict | None,  # type: ignore
-        alpha: float,
-        ) -> None:
+    @staticmethod
+    def setup(
+        algorithm: BaseEstimator | str,
+        scoring: dict | str | list[str] = ["r2", "rmse", "mae"],
+        random_state: int = 42,
+        n_jobs: int = -1,
+        **scoring_params,
+        ):
 
-        if scoring is None:
-            scoring_dict: dict = {
-                "r2"      : make_scorer(r2_score),
-                "rmse"    : make_scorer(
-                    lambda y_true, y_pred: root_mean_squared_error(y_true, y_pred),
-                    greater_is_better=False
-                    ),
-                "mae"     : make_scorer(mean_absolute_error,greater_is_better=False),
-                "quantile": make_scorer(
-                    lambda y_true, y_pred: mean_pinball_loss(
-                        y_true,
-                        y_pred,
-                        alpha=alpha,
-                        ),
-                    greater_is_better=False
-                    ),
-                }
-            scoring: dict = {}
-            if type(scoring_names) == str:
-                scoring_names = [scoring_names]
-            for i in scoring_names:
+        instance = MLWrapper()
+        instance._set_algorithm(
+            algorithm=algorithm,
+            random_state=random_state,
+            n_jobs=n_jobs,
+            )
+
+        # checking scoring_params for embedded scoring function parameters
+        try:
+            if (not "alpha" in scoring_params.keys()) and ('quantile' in scoring):
+                raise ValueError("Parameter alpha (quantile) not provided. Using standard value: 0.5")
+            if "alpha" in scoring_params.keys():
+                alpha = scoring_params["alpha"]
                 try:
-                    metric = scoring_dict[i]
-                    scoring[i] = metric
-                except KeyError as e:
-                    print(f"{i} is not available as a scoring metric")
-                    print(e)
-        else:
-            print(
-                "package functionality might not work properly with external scoring functions",
-                )
-        self.scoring = scoring
+                    alpha = float(alpha)
+                except ValueError as e:
+                    print("Parameter alpha (quantile) could not be converted to float. Using standard value: 0.5")
+                if not 0 < alpha < 1:
+                    raise ValueError(
+                        "Parameter alpha (quantile) must be a float between 0 and 1, Using standard value: 0.5",
+                        )
+        except ValueError:
+            print("Could not use provided alpha, using standard value: 0.5")
+            alpha: float = 0.5
 
+        instance._set_scoring(scoring=scoring, alpha=alpha)
 
-    def set_algorithm(
-        self,
-        algorithm_name: str | None,
-        algorithm: BaseEstimator | None,
-        random_state: int,
-        ) -> None:
-
-        if algorithm is None:
-            if algorithm_name is None:
-                print("please, provide an algorithm_name or algorithm object")
-            algorithms: dict = {
-                "bagging_reg"      : BaggingRegressor(random_state=random_state),
-                "extratrees_reg"   : ExtraTreesRegressor(random_state=random_state),
-                "gradboost_reg"    : GradientBoostingRegressor(random_state=random_state),
-                "histgradboost_reg": HistGradientBoostingRegressor(
-                    random_state=random_state,
-                    ),
-                "randomforest_reg" : RandomForestRegressor(random_state=random_state),
-                "xgboost_reg"      : XGBRegressor(random_state=random_state),
-                }
-            try:
-                self.algorithm = algorithms[algorithm_name]
-                self.algorithm_name = algorithm_name
-            except KeyError as e:
-                print(f"{algorithm_name} algorithm is not available, check docs")
-                print(e)
-        else:
-            self.algorithm = algorithm
-            print(
-                "package functionality might not work properly with external algorithms",
-                )
+        return instance
 
 
     def optimize_hyperparameters(
         self,
         dataset: DatasetWrapper,
-        param_grid: dict | None,
-        refit: str,
+        cv: int = 3,
+        param_grid: dict | None = None,
+        refit: str | None = None,
         population_size: int = 30,
         generations: int = 30,
         n_jobs=-1,
         ):
-        if self.algorithm is None:
-            print("define algorithm using setup()")
-            return None
+        self._check_attributes()
         if dataset.x_train.empty:
-            print("dataset empty")
-            return None
+            raise ValueError("dataset empty")
         if (self.algorithm_name is None) and (param_grid is None):
-            print(
+            raise ValueError(
                 "param_grid not provided. provide a param_grid compatible with sklearn_genetic (https://sklearn-genetic-opt.readthedocs.io/en/stable/api/space.html)\nalternatively, provide algorithm_name, to use one of the param_grids provided",
                 )
-            return None
 
         if param_grid is None:
-            param_grids: dict = {
+            available_param_grids: dict = {
                 "bagging_reg"      : {
                     "n_estimators"      : Integer(lower=10, upper=1000),  # 10
                     "max_samples"       : Continuous(lower=0.1, upper=1.0),  # 1.0
@@ -697,15 +662,16 @@ class MLConfig:
                     "reg_lambda"      : Continuous(lower=0.1, upper=2.0),  # L2 regularization
                     },
                 }
-            try:
-                param_grid = param_grids[self.algorithm_name]
-            except KeyError as e:
-                print(f"{e}\n\nprovided algorithm_name not available, check docs")
-                return None
+            if self.algorithm_name not in available_param_grids.keys():
+                raise ValueError(
+                    'provided algorithm_name does not have a param_grid available.\nPlease, provide a param_grid compatible with sklearn_genetic (https://sklearn-genetic-opt.readthedocs.io/en/stable/api/space.html)',
+                    )
+            param_grid = available_param_grids[self.algorithm_name]
         try:
             callback = DeltaThreshold(threshold=0.001, generations=3)
             param_search = GASearchCV(
                 estimator=self.algorithm,
+                cv=cv,
                 param_grid=param_grid,
                 scoring=self.scoring,
                 population_size=population_size,
@@ -716,9 +682,15 @@ class MLConfig:
                 )
             param_search.fit(dataset.x_train, dataset.y_train, callbacks=callback)
         except Exception as e:
-            print(f"something went wrong, check error:\n\n{e}")
-            return None
-        self.params = param_search.best_params_
+            print(f"something went wrong during optimization, check error:\n\n{e}")
+            exit()
+        try:
+            self.params = param_search.best_params_
+        except AttributeError as e:
+            print(
+                "Best parameters are not defined if no refit method (string with scorer name) is provided.\nCheck resulting param_search to determine best parameters, or rerun with refit method\n\n",
+                )
+            print(e)
         return param_search
 
 
@@ -730,21 +702,19 @@ class MLConfig:
         n_jobs=-1,
         ):
 
-        if self.algorithm is None:
-            print("define algorithm using setup()")
-            return None
+        self._check_attributes()
         if dataset.x_train.empty:
-            print("dataset empty")
-            return None
+            raise ValueError("dataset empty")
         if params is not None:
-            algorithm = self.algorithm.set_params(**params)
-        elif self.params is not None:
-            algorithm = self.algorithm.set_params(**self.params)
+            _algorithm = self.algorithm.set_params(**params)
+        elif self.params != {}:
+            _algorithm = self.algorithm.set_params(**self.params)
         else:
-            algorithm = self.algorithm
+            print("no provided parameters, using standard algorithm")
+            _algorithm = self.algorithm
 
         cv_results = cross_validate(
-            estimator=algorithm,
+            estimator=_algorithm,
             X=dataset.x_train,
             y=dataset.y_train,
             cv=cv,
@@ -756,57 +726,133 @@ class MLConfig:
         return cv_results
 
 
-    @staticmethod
-    def setup(
-        algorithm_name: str | None = None,
-        algorithm: BaseEstimator | None = None,
-        scoring_names: str | list[str] = ["r2", "rmse", "mae"],
-        scoring: dict | None = None,
-        random_state: int = 42,
-        **scoring_params,
+    def fit(
+        self,
+        dataset: DatasetWrapper,
+        params: dict | None = None,
         ):
-        if (algorithm_name is None) and (algorithm is None):
-            print(
-                "you must select an algorithm_name from the docs or provide an algorithm object",
-                )
-            return None
 
-        instance = MLConfig()
-        instance.set_algorithm(
-            algorithm_name=algorithm_name,
-            algorithm=algorithm,
-            random_state=random_state,
-            )
-
-        # checking scoring_params for embedded scoring functions
-        if "alpha" in scoring_params.keys():
-            alpha = scoring_params["alpha"]
-            if type(alpha) != float:
-                print("alpha must be a float between 0 and 1")
-                return None
-            elif not 0 < alpha < 1:
-                print("alpha must be between 0 and 1")
-                return None
+        self._check_attributes()
+        if dataset.x_train.empty:
+            raise ValueError("dataset empty")
+        if params is not None:
+            _algorithm = self.algorithm.set_params(**params)
+        elif self.params != {}:
+            _algorithm = self.algorithm.set_params(**self.params)
         else:
-            alpha: float = 0.5
+            print("no provided parameters, using standard algorithm")
+            _algorithm = self.algorithm
 
-        instance.set_scoring(scoring_names=scoring_names, scoring=scoring, alpha=alpha)
-
-        return instance
-
-
-def residue_diagnosis():
-
-    return
+        fit_model = _algorithm.fit(X=dataset.x_train, y=dataset.y_train)
+        self.fit_model = fit_model
+        return fit_model
 
 
-def deploy():
+    def residue_diagnosis():
 
-    return
+        return
 
-# algoritmo
-# tipo de erro
+
+    def deploy():
+
+        return
+
+
+    def _set_algorithm(
+        self,
+        algorithm: str | BaseEstimator,
+        random_state: int,
+        n_jobs: int,
+        ) -> None:
+
+        if isinstance(algorithm, str):
+            available_algorithms: dict = {
+                "bagging_reg"      : BaggingRegressor(random_state=random_state, n_jobs=n_jobs),
+                "extratrees_reg"   : ExtraTreesRegressor(random_state=random_state, n_jobs=n_jobs),
+                "gradboost_reg"    : GradientBoostingRegressor(random_state=random_state),
+                "histgradboost_reg": HistGradientBoostingRegressor(
+                    random_state=random_state, n_jobs=n_jobs,
+                    ),
+                "randomforest_reg" : RandomForestRegressor(random_state=random_state, n_jobs=n_jobs),
+                "xgboost_reg"      : XGBRegressor(random_state=random_state, n_jobs=n_jobs),
+                }
+            if algorithm not in available_algorithms.keys():
+                raise ValueError(f'Algorithm {algorithm} not recognized')
+            self.algorithm = available_algorithms[algorithm]
+            self.algorithm_name = algorithm
+        elif isinstance(algorithm, BaseEstimator):
+            self.algorithm = algorithm
+            self.algorithm_name = algorithm.__class__.__name__
+            print(
+                "package functionality might not work properly with external algorithms",
+                )
+        else:
+            raise TypeError("Input must be a string or an unfitted scikit-learn estimator.")
+
+
+    def _set_scoring(
+        self,
+        scoring: str | list[str] | dict,  # type: ignore
+        alpha: float,
+        ) -> None:
+
+        if isinstance(scoring, dict):
+            self.scoring = scoring
+            for scorer in scoring.values():
+                if not isinstance(scorer, _BaseScorer):
+                    raise TypeError(
+                        'Provided scorer is not a scikit-learn scorer, package functionality might not work properly.\nUse scikit-learn make_scorer function to create a scorer from a function.',
+                        )
+
+
+        elif isinstance(scoring, (str, list)):
+            available_scorers: dict = {
+                "r2"      : make_scorer(r2_score),
+                "rmse"    : make_scorer(
+                    lambda y_true, y_pred: root_mean_squared_error(y_true, y_pred),
+                    greater_is_better=False,
+                    ),
+                "mae"     : make_scorer(mean_absolute_error, greater_is_better=False),
+                "quantile": make_scorer(
+                    lambda y_true, y_pred: mean_pinball_loss(
+                        y_true,
+                        y_pred,
+                        alpha=alpha,
+                        ),
+                    greater_is_better=False,
+                    ),
+                }
+            scoring_dict: dict = {}
+            if isinstance(scoring, str):
+                scoring = [scoring]
+            for scoring_name in scoring:
+                try:
+                    scorer = available_scorers[scoring_name]
+                    scoring_dict[scoring_name] = scorer
+                except KeyError as e:
+                    print(f"{scoring_name} is not available as a scoring metric")
+                    print(e)
+            if scoring_dict == {}:
+                raise ValueError("No valid scoring metrics found from the provided list.")
+            self.scoring = scoring_dict
+        else:
+            raise TypeError("Input must be a dictionary, string, or list of strings.")
+
+
+    def _check_attributes(
+        self,
+        # check_params: bool = True,
+        ):
+        if self.algorithm is None:
+            raise ValueError("define algorithm using setup()")
+        if self.scoring == {}:
+            raise ValueError("define scoring using setup()")
+        # if check_params:
+        #     if self.params == {}:
+        #         raise ValueError("define params using setup()")
+
+
+
 # classificação x regressão
-# otimização
 # implementação em dataset externo
 # diagnóstico de resíduos
