@@ -137,13 +137,13 @@ def get_ro5_violations(molecules_df):
 
     for i in molecules_df.index:
         violations = 0
-        if molecules_df_violations.at[i, 'MW'] <= 500:
+        if molecules_df_violations.at[i, 'MW'] >= 500:
             violations += 1
-        if molecules_df_violations.at[i, 'LogP'] <= 5:
+        if molecules_df_violations.at[i, 'LogP'] >= 5:
             violations += 1
-        if molecules_df_violations.at[i, 'NumHDonors'] <= 5:
+        if molecules_df_violations.at[i, 'NumHDonors'] >= 5:
             violations += 1
-        if molecules_df_violations.at[i, 'NumHAcceptors'] <= 10:
+        if molecules_df_violations.at[i, 'NumHAcceptors'] >= 10:
             violations += 1
         molecules_df_violations.at[i, 'Ro5Violations'] = violations
 

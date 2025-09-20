@@ -452,6 +452,8 @@ def calculate_fingerprint(
         descriptors_df = pd.concat(objs=[descriptors_df, descriptors_df_i], axis=1)
         os.remove("descriptors.csv")
         os.remove("descriptors.csv.log")
+        os.remove("molecules.smi")
+        # TODO: implementar toggle
     descriptors_df = mm.remove_low_variance_columns(
         input_data=descriptors_df,
         threshold=0,
@@ -486,7 +488,6 @@ def assemble_dataset(
 
     return dataset
 
-
 class MLWrapper:
 
     def __init__(
@@ -514,7 +515,6 @@ class MLWrapper:
         n_jobs: int = -1,
         **scoring_params,
         ):
-
         instance = MLWrapper()
         instance._set_algorithm(
             algorithm=algorithm,
@@ -543,8 +543,8 @@ class MLWrapper:
         instance._set_scoring(scoring=scoring, alpha=alpha)
 
         return instance
-
-
+    
+# TODO: implementar outros métodos de busca (grid, random)
     def optimize_hyperparameters(
         self,
         dataset: DatasetWrapper,
@@ -754,8 +754,17 @@ class MLWrapper:
 
 
     def deploy():
-
+        #TODO
+        #dominio aplicabilidade
+        #predict
+        #return bonitinho
         return
+
+    # TODO
+    #função q gera relatório pdf ***
+    #dalex EXPLAIN
+    #ebook - machine learning e exai - conflito publicação 
+
 
 
     def _set_algorithm(
@@ -837,6 +846,7 @@ class MLWrapper:
             self.scoring = scoring_dict
         else:
             raise TypeError("Input must be a dictionary, string, or list of strings.")
+        # TODO: OLHAR ISSO - TESTAR SE CHEGA NO ELSE
 
 
     def _check_attributes(
@@ -854,5 +864,9 @@ class MLWrapper:
 
 
 # classificação x regressão
-# implementação em dataset externo
+# implementação em dataset externo com AD
 # diagnóstico de resíduos
+# FILTRAGEM POR SIMILARIDADE NA BUSCA DO DATASET
+# exploração de dados - MW, 
+
+# implementar em R
