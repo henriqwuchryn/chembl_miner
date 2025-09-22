@@ -62,7 +62,7 @@ class DatasetWrapper:
     @classmethod
     def from_path(cls, file_path):
         instance = cls()
-        instance.load(file_path=file_path)
+        instance._load_from_path(file_path=file_path)
         return instance
 
 
@@ -106,7 +106,7 @@ class DatasetWrapper:
             return self.general_data.loc[self.x_test.index]
 
 
-    def save(self, file_path) -> None:
+    def to_path(self, file_path) -> None:
         """
         Saves the entire dataset to CSV files inside file_path folder.
         """
@@ -124,7 +124,7 @@ class DatasetWrapper:
         print(f"Dataset saved to {file_path} folder")
 
 
-    def load(self, file_path) -> None:
+    def _load_from_path(self, file_path) -> None:
         """
         Loads the dataset from CSV files inside file_path folder.
         """
@@ -493,6 +493,81 @@ def assemble_dataset(
     return dataset
 
 
+class DeployDatasetWrapper:
+
+    def __init__(
+        self,
+        deploy_data: pd.DataFrame = None,
+        deploy_descriptors: pd.DataFrame = None,
+        prediction: pd.DataFrame = None,
+        ) -> None:
+        self.deploy_data = pd.DataFrame() if deploy_data is None else deploy_data
+        self.deploy_descriptors = pd.DataFrame() if deploy_descriptors is None else deploy_descriptors
+        self.prediction = pd.DataFrame() if prediction is None else prediction
+
+
+    @classmethod
+    def prepare_dataset(
+        cls,
+        deploy_data: pd.DataFrame,
+        model_features,
+        smiles_col: str = 'canonical_smiles',
+        fingerprint: str = 'pubchem',
+        ):
+
+        instance = cls()
+        instance.deploy_data = deploy_data
+        instance.prepare_deploy_dataset(model_features=model_features, smiles_col=smiles_col, fingerprint=fingerprint)
+
+
+    @classmethod
+    def from_path(cls, file_path):
+        if not os.path.exists(file_path):
+            print("file_path does not exist")
+        instance = cls()
+        instance.deploy_data = pd.read_csv(f"{file_path}/deploy_data.csv")
+        instance.deploy_descriptors = pd.read_csv(f"{file_path}/deploy_descriptors.csv")
+        instance.prediction = pd.read_csv(f"{file_path}/prediction.csv")
+
+
+    def to_path(self, file_path):
+
+        if not os.path.exists(file_path):
+            os.makedirs(file_path)
+
+        self.deploy_data.to_csv(f"{file_path}/deploy_data.csv", index_label="index")
+        self.deploy_descriptors.to_csv(f"{file_path}/deploy_descriptors.csv", index_label="index")
+        self.prediction.to_csv(f"{file_path}/prediction.csv", index_label="index")
+
+
+    def prepare_deploy_dataset(
+        self,
+        model_features,
+        smiles_col: str,
+        fingerprint: str,
+        ):
+
+        if smiles_col not in self.deploy_data.columns:
+            raise ValueError("could not find smiles column in provided data")
+        if self.deploy_descriptors.empty:
+            self.deploy_descriptors = calculate_fingerprint(
+                activity_df=self.deploy_data,
+                smiles_col=smiles_col,
+                fingerprint=fingerprint,
+                )
+        else:
+            print('descriptors already calculated')
+        try:
+            self.deploy_descriptors = self.deploy_descriptors.loc[:, model_features]
+        except KeyError as e:
+            print("Failed to align with model features.")
+            print(
+                "Please, rerun prepare_deploy_dataset method from DeployDatasetWrapper instance with new model_features iterable.",
+                )
+            print(".feature_names_in_ from the model, or .x_train.columns from the dataset wrapper.\n", )
+            print(e)
+
+
 class MLWrapper:
 
     def __init__(
@@ -504,9 +579,9 @@ class MLWrapper:
         param_grid: dict = None,
         params: dict = None,
         ):
-        self.fit_model = fit_model
         self.algorithm_name = algorithm_name
         self.algorithm = algorithm
+        self.fit_model = fit_model
         self.scoring = {} if scoring is None else scoring
         self.param_grid = {} if param_grid is None else param_grid
         self.params = {} if params is None else params
@@ -528,6 +603,7 @@ class MLWrapper:
             )
 
         # checking scoring_params for embedded scoring function parameters
+        alpha: float = 0.5
         try:
             if ("alpha" not in scoring_params.keys()) and ('quantile' in scoring):
                 raise ValueError("Parameter alpha (quantile) not provided. Using standard value: 0.5")
@@ -759,12 +835,31 @@ class MLWrapper:
         return
 
 
-    def deploy(self):
-        # TODO
+    def deploy(
+        self,
+        deploy_dataset: DeployDatasetWrapper,
+        ):
+
+        # TODO:
         # dominio aplicabilidade
-        # predict
-        # return bonitinho
-        return
+
+        if self.fit_model is None:
+            print('model not fit lol, go fit your model with fit()')
+            return None
+        if deploy_dataset.deploy_descriptors.empty:
+            print(
+                'deployment dataset provided does not contain descriptors, go set it up with prepare_dataset() or prepare_deploy_dataset() functions',
+                )
+            return None
+
+        prediction = self.fit_model.predict(deploy_dataset.deploy_descriptors)
+        deploy_dataset.prediction = prediction
+        if len(prediction) != deploy_dataset.deploy_data.shape[0]:
+            print("prediction shape does not match deploy_data.shape. Check descriptors for missing values.")
+        else:
+            deploy_dataset.deploy_data.loc[:, f'{self.algorithm_name}_prediction'] = prediction
+
+        return None
 
 
     # TODO
@@ -865,77 +960,6 @@ class MLWrapper:
         # if check_params:
         #     if self.params == {}:
         #         raise ValueError("define params using setup()")
-
-
-class DeployDatasetWrapper:
-
-    def __init__(
-        self,
-        deploy_data: pd.DataFrame = None,
-        deploy_descriptors: pd.DataFrame = None,
-        prediction: pd.DataFrame = None,
-        ) -> None:
-        self.deploy_data = pd.DataFrame() if deploy_data is None else deploy_data
-        self.deploy_descriptors = pd.DataFrame() if deploy_descriptors is None else deploy_descriptors
-        self.prediction = pd.DataFrame() if prediction is None else prediction
-
-
-    def prepare_deploy_dataset(
-        self,
-        model_features: iter[str],
-        smiles_col: str,
-        fingerprint: str,
-        ):
-
-        if smiles_col not in self.deploy_data.columns:
-            raise ValueError("could not find smiles column in provided data")
-        if self.deploy_descriptors.empty:
-            self.deploy_descriptors = calculate_fingerprint(
-                activity_df=self.deploy_data,
-                smiles_col=smiles_col,
-                fingerprint=fingerprint,
-                )
-        else:
-            print('descriptors already calculated')
-        try:
-            self.deploy_descriptors = self.deploy_descriptors[model_features]
-        except KeyError as e:
-            print("Failed to align with model features.")
-            print(
-                "Please, rerun prepare_deploy_dataset method from DeployDatasetWrapper instance with new model_features iterable\n",
-                )
-            print(e)
-
-
-    @classmethod
-    def prepare_dataset(
-        cls,
-        deploy_data: pd.DataFrame,
-        model_features: iter[str],
-        smiles_col: str ='canonical_smiles',
-        fingerprint: str ='pubchem',
-        ):
-
-        instance = cls()
-        instance.deploy_data = deploy_data
-        instance.prepare_deploy_dataset(model_features=model_features, smiles_col=smiles_col, fingerprint=fingerprint)
-
-
-    def to_path(self, file_path):
-
-        if not os.path.exists(file_path):
-            os.makedirs(file_path)
-
-        self.deploy_data.to_csv(f"{file_path}/deploy_data.csv", index_label="index")
-        self.deploy_descriptors.to_csv(f"{file_path}/deploy_descriptors.csv", index_label="index")
-        self.prediction.to_csv(f"{file_path}/prediction.csv", index_label="index")
-
-    @classmethod
-    def from_path(cls, file_path):
-        instance = cls()
-        instance.deploy_data = pd.read_csv(f"{file_path}/deploy_data.csv")
-        instance.deploy_descriptors = pd.read_csv(f"{file_path}/deploy_descriptors.csv")
-        instance.prediction = pd.read_csv(f"{file_path}/prediction.csv")
 
 # classificação x regressão
 # implementação em dataset externo com AD

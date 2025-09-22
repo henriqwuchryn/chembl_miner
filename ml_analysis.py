@@ -114,7 +114,7 @@ if not os.path.exists(f"{datasets_path}/gd.csv"):
     data = DatasetWrapper().load_raw_dataset(
         f"{datasets_folder}/{filename}.csv", general_columns, target_column
     )
-    data.save(datasets_path)
+    data.to_path(datasets_path)
 else:
     data = DatasetWrapper().load_dataset(datasets_path)
 
@@ -256,7 +256,7 @@ if select_features == 1:
     data.x_train = data.x_train[data.x_train.columns[sel_feats]]
     data.x_test = data.x_test[data.x_test.columns[sel_feats]]
     data.x_preprocessing = data.x_preprocessing[data.x_preprocessing.columns[sel_feats]]
-    data.save(feature_dataset_path)
+    data.to_path(feature_dataset_path)
 
 score_dfs = []
 
@@ -291,7 +291,7 @@ if outlier_detection == 1:
     print(f"Saving dataset without outliers at {outlier_dataset_path}")
     data.x_train = x_train_clean
     data.y_train = y_train_clean
-    data.save(outlier_dataset_path)
+    data.to_path(outlier_dataset_path)
     print(f"Outliers are available at {outlier_dataset_path}")
 
     print("\nEvaluating model with cleaned data")
