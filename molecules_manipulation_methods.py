@@ -5,8 +5,8 @@ from rdkit import Chem
 from rdkit.Chem import Descriptors, Lipinski
 
 
-def calculate_fingerprint(dataframe, fingerprint):
-    df_smi = dataframe['canonical_smiles']
+def calculate_fingerprint(dataframe, smiles_col, fingerprint):
+    df_smi = dataframe[smiles_col]
     df_smi.to_csv('molecules.smi', sep='\t', index=False, header=False)
     print(
         '''\nBeginning descriptor calculation. This will create a descriptors.csv file.
