@@ -3,6 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 from chembl_webresource_client.new_client import new_client
+from padelpy import padeldescriptor
 from sklearn.base import BaseEstimator
 from sklearn.ensemble import BaggingRegressor
 from sklearn.ensemble import ExtraTreesRegressor
@@ -27,10 +28,13 @@ from xgboost import XGBRegressor
 import machine_learning_methods as mlm
 import miscelanneous_methods as mm
 import molecules_manipulation_methods as mmm
+
+
 # TODO: fix imports everywhere; migrate functions from another files here with leading underscore
 
 
-verbosity: bool = 1
+verbosity: int = 1
+
 
 def set_verbosity(verbosity_level: int) -> None:
     """Determines verbosity level.
@@ -45,13 +49,13 @@ def set_verbosity(verbosity_level: int) -> None:
         print(f"Verbosity level is {verbosity}.")
 
 
-def _print(input_string: str) -> None:
+def print_low(input_string) -> None:
     global verbosity
-    if verbosity == 1:
+    if 1 <= verbosity <= 2:
         print(input_string)
 
 
-def __print(input_string: str) -> None:
+def print_high(input_string) -> None:
     global verbosity
     if verbosity == 2:
         print(input_string)
@@ -84,8 +88,17 @@ class DatasetWrapper:
     @classmethod
     def from_path(cls, file_path):
         instance = cls()
-        instance._load_from_path(file_path=file_path)
-        _print(f"DatasetWrapper object loaded from {file_path}")
+        try:
+            print_low(f"Loading DatasetWrapper object from {file_path}")
+            instance._load_from_path(file_path=file_path)
+            print_low(f"DatasetWrapper object loaded from {file_path}")
+            print_high(f"Dataset size: {instance.general_data.shape[0]}")
+            print_high(f"Train subset size: {len(instance.y_train)}")
+            print_high(f"Test shape: {len(instance.y_test)}")
+            print_high(f"Number of features: {instance.x_test.shape[1]}")
+        except Exception as e:
+            print("Dataset loading failed")
+            raise e
         return instance
 
 
@@ -98,19 +111,30 @@ class DatasetWrapper:
         use_structural_split: bool,
         holdout_size: float,
         random_state: int,
-        preprocessing_size: int,
         ):
         instance = cls()
-        instance._load_unsplit_dataframe(
-            full_df=full_df,
-            target_column=target_column,
-            nonfeature_columns=nonfeature_columns,
-            use_structural_split=use_structural_split,
-            holdout_size=holdout_size,
-            random_state=random_state,
-            preprocessing_size=preprocessing_size,
-            )
-        _print(f"DatasetWrapper object loaded from activity DataFrame.")
+        print_low("Loading DatasetWrapper object from unsplit dataframe and splitting data.")
+        print_high(f"Target column: '{target_column}'")
+        print_high(f"Holdout size: {holdout_size}")
+        print_high(f"Using structural split: {use_structural_split}")
+        print_high(f"Random state: {random_state}")
+        try:
+            instance._load_unsplit_dataframe(
+                full_df=full_df,
+                target_column=target_column,
+                nonfeature_columns=nonfeature_columns,
+                use_structural_split=use_structural_split,
+                holdout_size=holdout_size,
+                random_state=random_state,
+                )
+        except Exception as e:
+            print("Dataset loading failed")
+            raise e
+        print_low(f"DatasetWrapper object loaded from unsplit DataFrame and split into train/test sets")
+        print_high(f"Dataset size: {instance.general_data.shape[0]}")
+        print_high(f"Train subset size: {len(instance.y_train)}")
+        print_high(f"Test shape: {len(instance.y_test)}")
+        print_high(f"Number of features: {instance.x_test.shape[1]}")
         return instance
 
 
@@ -124,6 +148,8 @@ class DatasetWrapper:
         Returns:
             pd.DataFrame: Rows from general_data corresponding to the specified subset.
         """
+        subset_type = "train" if train_subset else "test"
+        print_high(f"Subsetting general_data for the {subset_type} set.")
         if train_subset:
             return self.general_data.loc[self.x_train.index]
         else:
@@ -137,43 +163,35 @@ class DatasetWrapper:
 
         if not os.path.exists(file_path):
             os.makedirs(file_path)
+            print_high(f"Creating directory: {file_path}")
 
-        self.general_data.to_csv(f"{file_path}/gd.csv", index_label="index")
-        self.x_train.to_csv(f"{file_path}/ftr.csv", index_label="index")
-        self.x_test.to_csv(f"{file_path}/fte.csv", index_label="index")
-        self.y_train.to_csv(f"{file_path}/ttr.csv", index_label="index")
-        self.y_test.to_csv(f"{file_path}/tte.csv", index_label="index")
-        self.x_preprocessing.to_csv(f"{file_path}/fpr.csv", index_label="index")
-        self.y_preprocessing.to_csv(f"{file_path}/tpr.csv", index_label="index")
-        _print(f"Dataset saved to {file_path} folder")
+        print_low(f"Saving dataset to {file_path} folder")
+        self.general_data.to_csv(f"{file_path}/general_data.csv", index_label="index")
+        print_high(f"Saved general_data to {file_path}/general_data.csv")
+        self.x_train.to_csv(f"{file_path}/x_train.csv", index_label="index")
+        print_high(f"Saved x_train to {file_path}/x_train.csv")
+        self.x_test.to_csv(f"{file_path}/x_test.csv", index_label="index")
+        print_high(f"Saved x_test to {file_path}/x_test.csv")
+        self.y_train.to_csv(f"{file_path}/y_train.csv", index_label="index")
+        print_high(f"Saved y_train to {file_path}/y_train.csv")
+        self.y_test.to_csv(f"{file_path}/y_test.csv", index_label="index")
+        print_high(f"Saved y_test to {file_path}/y_test.csv")
+        print_low(f"Dataset saved to {file_path} folder")
 
 
     def _load_from_path(self, file_path) -> None:
         """
         Loads the dataset from CSV files inside file_path folder.
         """
-        try:
-            self.general_data = pd.read_csv(f"{file_path}/gd.csv", index_col="index")
-            self.x_train = pd.read_csv(f"{file_path}/ftr.csv", index_col="index")
-            self.x_test = pd.read_csv(f"{file_path}/fte.csv", index_col="index")
-            self.y_train = pd.read_csv(f"{file_path}/ttr.csv", index_col="index")[
-                "neg_log_value"
-            ]
-            self.y_test = pd.read_csv(f"{file_path}/tte.csv", index_col="index")[
-                "neg_log_value"
-            ]
-            self.x_preprocessing = pd.read_csv(
-                f"{file_path}/fpr.csv",
-                index_col="index",
-                )
-            self.y_preprocessing = pd.read_csv(
-                f"{file_path}/tpr.csv",
-                index_col="index",
-                )["neg_log_value"]
-            _print(f"Dataset loaded from {file_path}")
-        except Exception as e:
-            _print(e)
-            _print("Dataset loading failed")
+        self.general_data = pd.read_csv(f"{file_path}/general_data.csv", index_col="index")
+        self.x_train = pd.read_csv(f"{file_path}/x_train.csv", index_col="index")
+        self.x_test = pd.read_csv(f"{file_path}/x_test.csv", index_col="index")
+        self.y_train = pd.read_csv(f"{file_path}/y_train.csv", index_col="index")[
+            "neg_log_value"
+        ]
+        self.y_test = pd.read_csv(f"{file_path}/y_test.csv", index_col="index")[
+            "neg_log_value"
+        ]
 
 
     def _load_unsplit_dataframe(
@@ -184,7 +202,6 @@ class DatasetWrapper:
         use_structural_split: bool,
         holdout_size: float,
         random_state: int,
-        preprocessing_size: int,
         ) -> None:
         """
         Loads an unsplit dataframe containing all columns and splits it into
@@ -197,8 +214,8 @@ class DatasetWrapper:
             use_structural_split (bool): Whether to use structural splitting or not.
             holdout_size (float): Proportion of the dataset to include in the test split. Standard value = 0.2.
             random_state (int): Random state for reproducibility. Standard value = 42.
-            preprocessing_size (int): Maximum size of preprocessing dataset.
         """
+
         self.general_data = full_df[nonfeature_columns]
         features = full_df.drop(columns=nonfeature_columns)
         target = full_df[target_column]
@@ -218,12 +235,7 @@ class DatasetWrapper:
                 train_size=holdout_size,
                 random_state=random_state,
                 )
-        _print(f"Unsplit dataset loaded and split into train/test sets")
         # Create preprocessing dataset
-        self._create_preprocessing_dataset(
-            random_state=random_state,
-            preprocessing_size=preprocessing_size,
-            )
 
 
     def _create_preprocessing_dataset(
@@ -246,26 +258,19 @@ class DatasetWrapper:
                 random_state=random_state,
                 )
             self.y_preprocessing = self.y_train.loc[self.x_preprocessing.index]
-            _print(f"Preprocessing dataset created with {preprocessing_size} samples.")
+            print_low(f"Preprocessing dataset created with {preprocessing_size} samples.")
         else:
             self.x_preprocessing = self.x_train
             self.y_preprocessing = self.y_train
-            _print("Preprocessing dataset uses the entire train dataset.")
+            print_low("Preprocessing dataset uses the entire train dataset.")
 
 
     def describe(self) -> None:
-        size = self.general_data.shape[0]
-        features = self.x_train.shape[1]
-        size_train = self.y_train.shape[0]
-        size_test = self.y_test.shape[0]
-        size_preprocessing = self.y_preprocessing.shape[0]
-        _print(
-            f"\nDataset size: {size}\nNumber of features: {features}\nTrain subset size: {size_train}\nTest subset size: {size_test}",
-            )
-        if size_preprocessing != size_train:
-            _print(
-                "This dataset contains a preprocessing subset of 7500 samples for hyperparameter optimization and feature selection",
-                )
+
+        print(f"Dataset size: {self.general_data.shape[0]}")
+        print(f"Train subset size: {len(self.y_train)}")
+        print(f"Test shape: {len(self.y_test)}")
+        print(f"Number of features: {self.x_test.shape[1]}")
 
 
 def get_activity_data(
@@ -280,10 +285,12 @@ def get_activity_data(
     Returns:
         dataset (pd.DataFrame): A dataframe object containing the processed dataset.
     """
+    print_low(f"🧪 Fetching '{activity_type}' activity data from ChEMBL for target: {target_chembl_id}")
     activity = new_client.activity  # type: ignore
     activity_query = activity.filter(target_chembl_id=target_chembl_id)
     activity_query = activity_query.filter(standard_type=activity_type)
     activity_df: pd.DataFrame = pd.DataFrame(data=activity_query)
+    print_high(f"Fetched {activity_df.shape[0]} records.")
     columns = [
         "molecule_chembl_id",
         "canonical_smiles",
@@ -297,7 +304,7 @@ def get_activity_data(
         "standard_units",
         ]
     activity_df = activity_df[columns]
-
+    print_low("✅ Data fetched successfully.")
     return activity_df
 
 
@@ -331,23 +338,28 @@ def review_assays(
     """
     assay_info = activity_df.loc[:, ["assay_chembl_id", "assay_description"]]
     unique_assays = len(assay_info.value_counts())
-    _print(
+    print_low(
         f"Displaying {min(unique_assays, max_entries)} of {unique_assays} total unique assays.",
         )
-    _print("To see more, adjust the 'max_entries' parameter.\n")
+    print_low("To see more, adjust the 'max_entries' parameter.\n")
     pd.set_option("display.max_rows", max_entries)
-    _print(assay_info.value_counts().head(n=max_entries))
+    print_low(assay_info.value_counts().head(n=max_entries))
 
     if assay_keywords is None:
+        print_high("No assay_keywords provided, returning None.")
+        if verbosity == 0:
+            print('No keywords provided. Increase verbosity to review assays.')
         return None
     else:
         if inner_join:
             pattern = "".join([rf"(?=.*{keyword})" for keyword in assay_keywords])
         else:
             pattern = "|".join(assay_keywords)
-        _print(f"\nfiltering assays by: {assay_keywords}")
-        _print(f"exclude keywords: {exclude_keywords}")
-        _print(f"inner join : {inner_join}")
+        print_low("Filtering assays by keywords.")
+        print_high(f"Keywords: {assay_keywords}")
+        print_high(f"Exclude keywords: {exclude_keywords}")
+        print_high(f"Inner join (AND logic): {inner_join}")
+        print_high(f"Resulting regex patter: {pattern}")
 
         mask = assay_info.loc[:, "assay_description"].str.contains(
             pattern,
@@ -359,15 +371,15 @@ def review_assays(
         else:
             selected_assays = assay_info[mask]
         unique_selected_assays = len(selected_assays.value_counts())
-        _print(
+        print_low(
             f"Displaying {min(unique_selected_assays, max_entries)} of {unique_selected_assays} filtered assays.\n",
             )
-        _print(selected_assays.value_counts().head(n=max_entries))
+        print_low(selected_assays.value_counts().head(n=max_entries))
         selected_id_list = selected_assays.loc[:, "assay_chembl_id"].unique().tolist()  # type: ignore
         return selected_id_list
 
 
-def filter_by_assay(
+def _filter_by_assay(
     activity_df: pd.DataFrame,
     assay_ids: list[str],
     ) -> pd.DataFrame:
@@ -380,13 +392,12 @@ def filter_by_assay(
     Returns:
         pd.DataFrame:
     """
-    _print(f"dataframe initial size: {activity_df.shape[0]}")
+
     filtered_activity_df = activity_df.loc[
         activity_df["assay_chembl_id"].isin(assay_ids)
     ]
-    _print(f"dataframe filtered size: {filtered_activity_df.shape[0]}")
     if filtered_activity_df.empty:
-        _print("filtration emptied dataframe, returning original dataframe")
+        print("Filtration by assay ids emptied dataframe, returning original dataframe.")
         return activity_df
     else:
         return filtered_activity_df
@@ -402,26 +413,44 @@ def preprocess_data(
         "intermediate": 10000,
         },
     ) -> pd.DataFrame:
+    print_low("Starting data preprocessing.")
+    print_high("Converting 'standard_value' column to numeric, coercing errors (failing to convert will result in NA).")
     activity_df["standard_value"] = pd.to_numeric(
         arg=activity_df["standard_value"],
         errors="coerce",
         )
+    print_high("Filtering out 'standard_value' entries with infinite values.")
+    activity_df = activity_df.replace([np.inf, -np.inf], np.nan)
+    print_high("Filtering out non-positive 'standard_value' entries.")
     activity_df = activity_df[activity_df["standard_value"] > 0]
+    print_high("Dropping rows with NA in key columns.")
     activity_df = activity_df.dropna(subset=["molecule_chembl_id", "canonical_smiles", "standard_value"])
     if assay_ids is not None:
-        activity_df = filter_by_assay(activity_df=activity_df, assay_ids=assay_ids)
+        print_low("Filtering DataFrame by assay ids.")
+        print_high(f"Dataframe initial size: {activity_df.shape[0]}")
+        activity_df = _filter_by_assay(activity_df=activity_df, assay_ids=assay_ids)
+        print_high(f"Dataframe filtered size: {activity_df.shape[0]}")
+    print_high("Calculating Lipinski descriptors.")
     activity_df = mmm.get_lipinski_descriptors(molecules_df=activity_df)
+    print_high("Calculating Rule of 5 violations.")
     activity_df = mmm.get_ro5_violations(molecules_df=activity_df)
     if convert_units:
+        print_high("Converting standard units to Molar (mol/L)")
         activity_df = mmm.convert_to_m(molecules_df=activity_df)
+    print_high(f"Treating duplicates using '{duplicate_treatment}' method.")
     activity_df = mm.treat_duplicates(
         molecules_df=activity_df,
         method=duplicate_treatment,
         )
+    print_high("Normalizing 'standard_value'.")
     activity_df = mm.normalize_value(molecules_df=activity_df)
+    print_high("Calculating negative logarithm of 'standard_value'.")
     activity_df = mm.get_neg_log(molecules_df=activity_df)
+    print_high("Resetting index.")
+
     activity_df = activity_df.reset_index(drop=True)
     if activity_thresholds is not None:
+        print_high("Assigning bioactivity classes based on thresholds.")
         bioactivity_class = []
         sorted_thresholds = sorted(
             activity_thresholds.items(),
@@ -438,54 +467,91 @@ def preprocess_data(
             bioactivity_class.append(assigned_class)
 
         activity_df["bioactivity_class"] = bioactivity_class
+    print_low("Data preprocessing complete.")
 
     return activity_df
 
 
-def calculate_finger_print(
+def _calculate_fingerprint(
     activity_df: pd.DataFrame,
     smiles_col="canonical_smiles",
-    finger_print: str | list[str] = "pubchem",
+    fingerprint: str | list[str] = "pubchem",
+    ) -> pd.DataFrame:
+
+    df_smi = activity_df[smiles_col]
+    df_smi.to_csv('molecules.smi', sep='\t', index=False, header=False)
+    padeldescriptor(
+        mol_dir='molecules.smi',
+        d_file='descriptors.csv',
+        descriptortypes=fingerprint,
+        detectaromaticity=True,
+        standardizenitro=True,
+        standardizetautomers=True,
+        threads=-1,
+        removesalt=True,
+        log=True,
+        fingerprints=True,
+        )
+    descriptors_df_i = pd.read_csv("descriptors.csv")
+    descriptors_df_i = descriptors_df_i.drop("Name", axis=1)
+    descriptors_df_i = pd.DataFrame(data=descriptors_df_i, index=activity_df.index)
+    os.remove("descriptors.csv")
+    os.remove("descriptors.csv.log")
+    os.remove("molecules.smi")
+    return descriptors_df_i
+
+
+def calculate_fingerprint(
+    activity_df: pd.DataFrame,
+    smiles_col="canonical_smiles",
+    fingerprint: str | list[str] = "pubchem",
     remove_low_variance: bool = False,
     low_variance_threshold: float = 0.0,
     ) -> pd.DataFrame:
     # TODO: generalizar para demais descritores
-    finger_print_dict = {
-        "atompairs2d"      : "finger_print/AtomPairs2DFinger_printer.xml",
-        "atompairs2dcount" : "finger_print/AtomPairs2DFinger_printCount.xml",
-        "estate"           : "finger_print/EStateFinger_printer.xml",
-        "extended"         : "finger_print/ExtendedFinger_printer.xml",
-        "finger_printer"    : "finger_print/Finger_printer.xml",
-        "graphonly"        : "finger_print/GraphOnlyFinger_printer.xml",
-        "klekota"          : "finger_print/KlekotaRothFinger_printer.xml",
-        "klekotacount"     : "finger_print/KlekotaRothFinger_printCount.xml",
-        "maccs"            : "finger_print/MACCSFinger_printer.xml",
-        "pubchem"          : "finger_print/PubchemFinger_printer.xml",
-        "substructure"     : "finger_print/SubstructureFinger_printer.xml",
-        "substructurecount": "finger_print/SubstructureFinger_printCount.xml",
+    print_low("Starting fingerprint calculation.")
+    print_high("This will create temporary files in this folder: descriptors.csv; descriptors.csv.log and molecules.smi")
+    fingerprint_dict = {
+        "atompairs2d"      : "fingerprint/AtomPairs2Dfingerprinter.xml",
+        "atompairs2dcount" : "fingerprint/AtomPairs2DfingerprintCount.xml",
+        "estate"           : "fingerprint/EStatefingerprinter.xml",
+        "extended"         : "fingerprint/Extendedfingerprinter.xml",
+        "fingerprinter"    : "fingerprint/fingerprinter.xml",
+        "graphonly"        : "fingerprint/GraphOnlyfingerprinter.xml",
+        "klekota"          : "fingerprint/KlekotaRothfingerprinter.xml",
+        "klekotacount"     : "fingerprint/KlekotaRothfingerprintCount.xml",
+        "maccs"            : "fingerprint/MACCSfingerprinter.xml",
+        "pubchem"          : "fingerprint/Pubchemfingerprinter.xml",
+        "substructure"     : "fingerprint/Substructurefingerprinter.xml",
+        "substructurecount": "fingerprint/SubstructurefingerprintCount.xml",
         }
 
-    if type(finger_print) == str:
-        finger_print = [finger_print]
+    if type(fingerprint) == str:
+        fingerprint = [fingerprint]
 
     descriptors_df = pd.DataFrame(index=activity_df.index)
 
-    for i in finger_print:
-        finger_print_path = finger_print_dict[i]
-        mmm.calculate_finger_print(dataframe=activity_df, smiles_col=smiles_col, finger_print=finger_print_path)
-        descriptors_df_i = pd.read_csv("descriptors.csv")
-        descriptors_df_i = descriptors_df_i.drop("Name", axis=1)
-        descriptors_df_i = pd.DataFrame(data=descriptors_df_i, index=activity_df.index)
+    for i in fingerprint:
+        print_high(f"Calculating '{i}' fingerprint.")
+        fingerprint_path = fingerprint_dict[i]
+        descriptors_df_i = _calculate_fingerprint(
+            activity_df=activity_df,
+            smiles_col=smiles_col,
+            fingerprint=fingerprint_path,
+            )
         descriptors_df = pd.concat(objs=[descriptors_df, descriptors_df_i], axis=1)
-        os.remove("descriptors.csv")
-        os.remove("descriptors.csv.log")
-        os.remove("molecules.smi")
-
+    print_high(f"Total features from fingerprints: {descriptors_df.shape[1]}")
     if remove_low_variance:
+        print_low("Removing low variance features.")
+        print_high(f"Variance threshold: {low_variance_threshold}")
+        initial_cols = descriptors_df.shape[1]
         descriptors_df = mm.remove_low_variance_columns(
             input_data=descriptors_df,
             threshold=low_variance_threshold,
             )
+        final_cols = descriptors_df.shape[1]
+        print_high(f"Removed {initial_cols - final_cols} low variance columns. Kept {final_cols}.")
+    print_low("Fingerprint calculation complete.")
 
     return descriptors_df
 
@@ -499,11 +565,9 @@ def assemble_dataset(
     random_state: int = 42,
     preprocessing_size: int = 7500,
     ) -> DatasetWrapper:
+    print_low("Assembling dataset.")
     nonfeature_columns = activity_df.columns
     dataset_df = pd.concat([activity_df, descriptors_df], axis=1)
-    dataset_df = dataset_df.replace([np.inf, -np.inf], np.nan)
-    essential_cols = list(descriptors_df.columns) + [target_column, "canonical_smiles"]
-    dataset_df = dataset_df.dropna(subset=essential_cols)
     dataset = DatasetWrapper.from_dataframe(
         full_df=dataset_df,
         target_column=target_column,
@@ -513,6 +577,7 @@ def assemble_dataset(
         random_state=random_state,
         preprocessing_size=preprocessing_size,
         )
+    print_low("Dataset assembled.")
 
     return dataset
 
@@ -536,62 +601,71 @@ class DeployDatasetWrapper:
         deploy_data: pd.DataFrame,
         model_features,
         smiles_col: str = 'canonical_smiles',
-        finger_print: str = 'pubchem',
+        fingerprint: str = 'pubchem',
         ):
-
+        print_low("Preparing DeployDatasetWrapper object.")
         instance = cls()
         instance.deploy_data = deploy_data
-        instance.prepare_deploy_dataset(model_features=model_features, smiles_col=smiles_col, finger_print=finger_print)
+        instance.prepare_deploy_dataset(model_features=model_features, smiles_col=smiles_col, fingerprint=fingerprint)
+        print_low("DeployDatasetWrapper object prepared.")
         return instance
 
 
     @classmethod
     def from_path(cls, file_path):
         if not os.path.exists(file_path):
-            _print("file_path does not exist")
+            print("Provided file_path does not exist")
+        print_low(f"Loading DeployDatasetWrapper object from {file_path}.")
         instance = cls()
         instance.deploy_data = pd.read_csv(f"{file_path}/deploy_data.csv")
         instance.deploy_descriptors = pd.read_csv(f"{file_path}/deploy_descriptors.csv")
         instance.prediction = pd.read_csv(f"{file_path}/prediction.csv")
+        print_low("DeploymentDatasetWrapper object with data, descriptors, and previous predictions loaded.")
         return instance
 
 
     def to_path(self, file_path):
-
+        print_low(f"Saving DeploymentDatasetWrapper object to {file_path}.")
         if not os.path.exists(file_path):
+            print_high(f"Creating directory: {file_path}")
             os.makedirs(file_path)
 
         self.deploy_data.to_csv(f"{file_path}/deploy_data.csv", index_label="index")
         self.deploy_descriptors.to_csv(f"{file_path}/deploy_descriptors.csv", index_label="index")
         self.prediction.to_csv(f"{file_path}/prediction.csv", index_label="index")
+        print_low("DeploymentDatasetWrapper object with data, descriptors, and predictions saved.")
 
 
     def prepare_deploy_dataset(
         self,
         model_features,
         smiles_col: str,
-        finger_print: str,
+        fingerprint: str,
         ):
 
         if smiles_col not in self.deploy_data.columns:
-            raise ValueError("could not find smiles column in provided data")
+            raise ValueError("Could not find smiles column in provided data")
         if self.deploy_descriptors.empty:
-            self.deploy_descriptors = calculate_finger_print(
+            print_low("No descriptors found on DeploymentDatasetWrapper object, calculating now.")
+            self.deploy_descriptors = calculate_fingerprint(
                 activity_df=self.deploy_data,
                 smiles_col=smiles_col,
-                finger_print=finger_print,
+                fingerprint=fingerprint,
                 )
         else:
-            _print('descriptors already calculated')
+            print_low('Descriptors already calculated, skipping calculation')
+            print_low("Aligning deployment features with model features...")
+            print_high(f"Deployment descriptors shape before alignment: {self.deploy_descriptors.shape}")
         try:
             self.deploy_descriptors = self.deploy_descriptors.loc[:, model_features]
+            print_high(f"Deployment descriptors shape after alignment: {self.deploy_descriptors.shape}")
         except KeyError as e:
-            _print("Failed to align with model features.")
-            _print(
+            print("Failed to align with model features.")
+            print_low(
                 "Please, rerun prepare_deploy_dataset method from DeployDatasetWrapper instance with new model_features iterable.",
                 )
-            _print(".feature_names_in_ from the model, or .x_train.columns from the dataset wrapper.\n", )
-            _print(e)
+            print_low("Tip: use feature_names_in_ attribute from the model, or x_train.columns attribute from the dataset wrapper.\n", )
+            print_low(e)
 
 
 class MLWrapper:
@@ -621,33 +695,41 @@ class MLWrapper:
         n_jobs: int = -1,
         **scoring_params,
         ):
+        print_low("Setting up MLWrapper object.")
         instance = MLWrapper()
         instance._set_algorithm(
             algorithm=algorithm,
             random_state=random_state,
             n_jobs=n_jobs,
             )
+        print_high(f"Algorithm set to: {instance.algorithm_name}")
+        print_high(f"Random state: {random_state}, n_jobs: {n_jobs}")
 
         # checking scoring_params for embedded scoring function parameters
         alpha: float = 0.5
         try:
             if ("alpha" not in scoring_params.keys()) and ('quantile' in scoring):
-                raise ValueError("Parameter alpha (quantile) not provided. Using standard value: 0.5")
+                raise ValueError("Parameter alpha (quantile) not provided.")
             if "alpha" in scoring_params.keys():
                 alpha = scoring_params["alpha"]
                 try:
                     alpha = float(alpha)
                 except ValueError as e:
-                    _print("Parameter alpha (quantile) could not be converted to float. Using standard value: 0.5")
+                    print_low("Parameter alpha (quantile) could not be converted to float.")
+                    print(e)
                 if not 0 < alpha < 1:
                     raise ValueError(
-                        "Parameter alpha (quantile) must be a float between 0 and 1, Using standard value: 0.5",
+                        "Parameter alpha (quantile) must be a float between 0 and 1,",
                         )
+                else:
+                    print_high(f"Using alpha={alpha} for quantile scoring.")
         except ValueError:
-            _print("Could not use provided alpha, using standard value: 0.5")
+            print("Could not use provided alpha, using standard value: 0.5")
             alpha: float = 0.5
 
         instance._set_scoring(scoring=scoring, alpha=alpha)
+        print_high(f"Scoring metrics set to: {list(instance.scoring.keys())}")
+        print_low("✅ MLWrapper setup complete.")
 
         return instance
 
@@ -658,18 +740,26 @@ class MLWrapper:
         dataset: DatasetWrapper,
         cv: int = 3,
         param_grid: dict | None = None,
-        refit: str | None = None,
+        refit: str | bool = True,
         population_size: int = 30,
         generations: int = 30,
         n_jobs=-1,
         ):
+        print_low("Starting hyperparameter optimization with GASearchCV (genetic algorithm parameter search).")
         self._check_attributes()
         if dataset.x_train.empty:
-            raise ValueError("dataset empty")
+            raise ValueError("Dataset empty.")
         if (self.algorithm_name is None) and (param_grid is None):
             raise ValueError(
-                "param_grid not provided. provide a param_grid compatible with sklearn_genetic (https://sklearn-genetic-opt.readthedocs.io/en/stable/api/space.html)\nalternatively, provide algorithm_name, to use one of the param_grids provided",
+                "A param_grid was not provided. Provide a param_grid compatible with sklearn_genetic (https://sklearn-genetic-opt.readthedocs.io/en/stable/api/space.html)\nAlternatively, provide algorithm_name, to use one of the param_grids provided by the package.",
                 )
+        print_high(f"CV folds: {cv}, Population: {population_size}, Generations: {generations}")
+        if refit:
+            print_high(f"Refit: {refit}. If using multiple metrics, will not provide a final model or best_params . ")
+        elif isinstance(refit, str):
+            print_high(f"Refitting model based on best '{refit}' score.")
+        else:
+            print_high(f"Refit: {refit}. Will not provide a final model or best_params. ")
 
         if param_grid is None:
             available_param_grids: dict = {
@@ -774,7 +864,10 @@ class MLWrapper:
                 raise ValueError(
                     'provided algorithm_name does not have a param_grid available.\nPlease, provide a param_grid compatible with sklearn_genetic (https://sklearn-genetic-opt.readthedocs.io/en/stable/api/space.html)',
                     )
+            print_high(f"Using pre-defined parameter grid for '{self.algorithm_name}'.")
             param_grid = available_param_grids[self.algorithm_name]
+        else:
+            print_high("Using user-provided parameter grid.")
         try:
             callback = DeltaThreshold(threshold=0.001, generations=3)
             param_search = GASearchCV(
@@ -789,16 +882,16 @@ class MLWrapper:
                 return_train_score=True,
                 )
             param_search.fit(dataset.x_train, dataset.y_train, callbacks=callback)
+            print_low("Hyperparameter optimization complete.")
         except Exception as e:
-            _print(f"something went wrong during optimization, check error:\n\n{e}")
-            exit()
+            print("Something went wrong during optimization.")
+            raise e
         try:
             self.params = param_search.best_params_
         except AttributeError as e:
-            _print(
-                "Best parameters are not defined if no refit method (string with scorer name) is provided.\nCheck resulting param_search to determine best parameters, or rerun with refit method\n\n",
-                )
-            _print(e)
+            print("Best parameters were not defined because no refit method (string with scorer name) was provided.")
+            print_low("Check resulting param_search to determine best parameters, or rerun with refit method",)
+            print(e)
         return param_search
 
 
@@ -809,18 +902,21 @@ class MLWrapper:
         params: dict | None = None,
         n_jobs=-1,
         ):
-
+        print_low(f"Starting model evaluation with {cv}-fold cross-validation...")
         self._check_attributes()
         if dataset.x_train.empty:
-            raise ValueError("dataset empty")
+            raise ValueError("Dataset empty")
         if params is not None:
+            print_high("Using provided parameters for evaluation.")
             _algorithm = self.algorithm.set_params(**params)
         elif self.params != {}:
+            print_high("Using optimized parameters found from hyperparameter optimization.")
             _algorithm = self.algorithm.set_params(**self.params)
         else:
-            _print("no provided parameters, using standard algorithm")
+            print_low("No provided parameters, using standard algorithm")
             _algorithm = self.algorithm
 
+        print_high(f"Model parameters for CV: {_algorithm.get_params()}")
         cv_results = cross_validate(
             estimator=_algorithm,
             X=dataset.x_train,
@@ -830,6 +926,7 @@ class MLWrapper:
             n_jobs=n_jobs,
             return_train_score=True,
             )
+        print_low("Cross-validation complete.")
         # TODO: add a way to visualize cv results with generalization
         return cv_results
 
@@ -839,20 +936,24 @@ class MLWrapper:
         dataset: DatasetWrapper,
         params: dict | None = None,
         ):
-
+        print_low("Fitting model on the training dataset.")
         self._check_attributes()
         if dataset.x_train.empty:
-            raise ValueError("dataset empty")
+            raise ValueError("Dataset empty")
         if params is not None:
+            print_high("Using provided parameters for evaluation.")
             _algorithm = self.algorithm.set_params(**params)
         elif self.params != {}:
+            print_high("Using optimized parameters found from hyperparameter optimization.")
             _algorithm = self.algorithm.set_params(**self.params)
         else:
-            _print("no provided parameters, using standard algorithm")
+            print("No provided parameters, using standard algorithm")
             _algorithm = self.algorithm
 
+        print_high(f"Final model parameters: {_algorithm.get_params()}")
         fit_model = _algorithm.fit(X=dataset.x_train, y=dataset.y_train)
         self.fit_model = fit_model
+        print_low("Model fitting complete.")
         return fit_model
 
 
@@ -865,26 +966,28 @@ class MLWrapper:
         self,
         deploy_dataset: DeployDatasetWrapper,
         ):
-
+        print_low("🚢 Deploying model and making predictions...")
         # TODO:
         # dominio aplicabilidade
 
         if self.fit_model is None:
-            _print('model not fit lol, go fit your model with fit()')
+            print('Model not fit. Please use the .fit() method first.')
             return None
         if deploy_dataset.deploy_descriptors.empty:
-            _print(
-                'deployment dataset provided does not contain descriptors, go set it up with prepare_dataset() or prepare_deploy_dataset() functions',
+            print(
+                'Deployment dataset provided does not contain descriptors. Please use prepare_dataset() or prepare_deploy_dataset() methods.',
                 )
             return None
 
+        print_high(f"Predicting on {deploy_dataset.deploy_descriptors.shape[0]} samples.")
         prediction = self.fit_model.predict(deploy_dataset.deploy_descriptors)
         deploy_dataset.prediction = prediction
         if len(prediction) != deploy_dataset.deploy_data.shape[0]:
-            _print("prediction shape does not match deploy_data.shape. Check descriptors for missing values.")
+            print_low("Prediction shape does not match deploy_data.shape. Check descriptors for missing values.")
         else:
             deploy_dataset.deploy_data.loc[:, f'{self.algorithm_name}_prediction'] = prediction
-
+            print_high(f"Predictions added to deploy_data under column '{self.algorithm_name}_prediction'.")
+        print_low("✅ Prediction complete.")
         return None
 
 
@@ -918,8 +1021,8 @@ class MLWrapper:
         elif isinstance(algorithm, BaseEstimator):
             self.algorithm = algorithm
             self.algorithm_name = algorithm.__class__.__name__
-            _print(
-                "package functionality might not work properly with external algorithms",
+            print_low(
+                "Package functionality might not work properly with external algorithms",
                 )
         else:
             raise TypeError("Input must be a string or an unfitted scikit-learn estimator.")
@@ -965,8 +1068,8 @@ class MLWrapper:
                     scorer = available_scorers[scoring_name]
                     scoring_dict[scoring_name] = scorer
                 except KeyError as e:
-                    _print(f"{scoring_name} is not available as a scoring metric")
-                    _print(e)
+                    print_low(f"{scoring_name} is not available as a scoring metric")
+                    print_low(e)
             if scoring_dict == {}:
                 raise ValueError("No valid scoring metrics found from the provided list.")
             self.scoring = scoring_dict
@@ -980,9 +1083,9 @@ class MLWrapper:
         # check_params: bool = True,
         ):
         if self.algorithm is None:
-            raise ValueError("define algorithm using setup()")
+            raise ValueError("Algorithm not set. Define algorithm using setup()")
         if self.scoring == {}:
-            raise ValueError("define scoring using setup()")
+            raise ValueError("Scorers not set. Define scoring using setup()")
         # if check_params:
         #     if self.params == {}:
         #         raise ValueError("define params using setup()")
