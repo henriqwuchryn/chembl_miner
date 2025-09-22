@@ -518,6 +518,7 @@ class DeployDatasetWrapper:
         instance = cls()
         instance.deploy_data = deploy_data
         instance.prepare_deploy_dataset(model_features=model_features, smiles_col=smiles_col, fingerprint=fingerprint)
+        return instance
 
 
     @classmethod
@@ -528,6 +529,7 @@ class DeployDatasetWrapper:
         instance.deploy_data = pd.read_csv(f"{file_path}/deploy_data.csv")
         instance.deploy_descriptors = pd.read_csv(f"{file_path}/deploy_descriptors.csv")
         instance.prediction = pd.read_csv(f"{file_path}/prediction.csv")
+        return instance
 
 
     def to_path(self, file_path):
