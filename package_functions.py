@@ -27,11 +27,33 @@ from xgboost import XGBRegressor
 import machine_learning_methods as mlm
 import miscelanneous_methods as mm
 import molecules_manipulation_methods as mmm
-
-
 # TODO: fix imports everywhere; migrate functions from another files here with leading underscore
-def _print(input_string: str, verbosity: bool) -> None:
-    if verbosity:
+
+
+verbosity: bool = 1
+
+def set_verbosity(verbosity_level: int) -> None:
+    """Determines verbosity level.
+    Verbosity of 0 means no output at all, except for erros.
+    Verbosity of 1 means basic output containing information of each step start and end
+    Verbosity of 2 means complete output, containing every information and parameter - Great for logs"""
+    global verbosity
+    if 0 <= verbosity_level <= 2:
+        verbosity = verbosity_level
+    else:
+        print(f"Verbosity level must be 0, 1 or 2. Got {verbosity_level}.")
+        print(f"Verbosity level is {verbosity}.")
+
+
+def _print(input_string: str) -> None:
+    global verbosity
+    if verbosity == 1:
+        print(input_string)
+
+
+def __print(input_string: str) -> None:
+    global verbosity
+    if verbosity == 2:
         print(input_string)
 
 
@@ -63,6 +85,7 @@ class DatasetWrapper:
     def from_path(cls, file_path):
         instance = cls()
         instance._load_from_path(file_path=file_path)
+        _print(f"DatasetWrapper object loaded from {file_path}")
         return instance
 
 
@@ -87,6 +110,7 @@ class DatasetWrapper:
             random_state=random_state,
             preprocessing_size=preprocessing_size,
             )
+        _print(f"DatasetWrapper object loaded from activity DataFrame.")
         return instance
 
 
@@ -121,7 +145,7 @@ class DatasetWrapper:
         self.y_test.to_csv(f"{file_path}/tte.csv", index_label="index")
         self.x_preprocessing.to_csv(f"{file_path}/fpr.csv", index_label="index")
         self.y_preprocessing.to_csv(f"{file_path}/tpr.csv", index_label="index")
-        print(f"Dataset saved to {file_path} folder")
+        _print(f"Dataset saved to {file_path} folder")
 
 
     def _load_from_path(self, file_path) -> None:
@@ -146,10 +170,10 @@ class DatasetWrapper:
                 f"{file_path}/tpr.csv",
                 index_col="index",
                 )["neg_log_value"]
-            print(f"Dataset loaded from {file_path}")
+            _print(f"Dataset loaded from {file_path}")
         except Exception as e:
-            print(e)
-            print("Dataset loading failed")
+            _print(e)
+            _print("Dataset loading failed")
 
 
     def _load_unsplit_dataframe(
@@ -194,7 +218,7 @@ class DatasetWrapper:
                 train_size=holdout_size,
                 random_state=random_state,
                 )
-        print(f"Unsplit dataset loaded and split into train/test sets")
+        _print(f"Unsplit dataset loaded and split into train/test sets")
         # Create preprocessing dataset
         self._create_preprocessing_dataset(
             random_state=random_state,
@@ -222,11 +246,11 @@ class DatasetWrapper:
                 random_state=random_state,
                 )
             self.y_preprocessing = self.y_train.loc[self.x_preprocessing.index]
-            print(f"Preprocessing dataset created with {preprocessing_size} samples.")
+            _print(f"Preprocessing dataset created with {preprocessing_size} samples.")
         else:
             self.x_preprocessing = self.x_train
             self.y_preprocessing = self.y_train
-            print("Preprocessing dataset uses the entire train dataset.")
+            _print("Preprocessing dataset uses the entire train dataset.")
 
 
     def describe(self) -> None:
@@ -235,11 +259,11 @@ class DatasetWrapper:
         size_train = self.y_train.shape[0]
         size_test = self.y_test.shape[0]
         size_preprocessing = self.y_preprocessing.shape[0]
-        print(
+        _print(
             f"\nDataset size: {size}\nNumber of features: {features}\nTrain subset size: {size_train}\nTest subset size: {size_test}",
             )
         if size_preprocessing != size_train:
-            print(
+            _print(
                 "This dataset contains a preprocessing subset of 7500 samples for hyperparameter optimization and feature selection",
                 )
 
@@ -307,12 +331,12 @@ def review_assays(
     """
     assay_info = activity_df.loc[:, ["assay_chembl_id", "assay_description"]]
     unique_assays = len(assay_info.value_counts())
-    print(
+    _print(
         f"Displaying {min(unique_assays, max_entries)} of {unique_assays} total unique assays.",
         )
-    print("To see more, adjust the 'max_entries' parameter.\n")
+    _print("To see more, adjust the 'max_entries' parameter.\n")
     pd.set_option("display.max_rows", max_entries)
-    print(assay_info.value_counts().head(n=max_entries))
+    _print(assay_info.value_counts().head(n=max_entries))
 
     if assay_keywords is None:
         return None
@@ -321,9 +345,9 @@ def review_assays(
             pattern = "".join([rf"(?=.*{keyword})" for keyword in assay_keywords])
         else:
             pattern = "|".join(assay_keywords)
-        print(f"\nfiltering assays by: {assay_keywords}")
-        print(f"exclude keywords: {exclude_keywords}")
-        print(f"inner join : {inner_join}")
+        _print(f"\nfiltering assays by: {assay_keywords}")
+        _print(f"exclude keywords: {exclude_keywords}")
+        _print(f"inner join : {inner_join}")
 
         mask = assay_info.loc[:, "assay_description"].str.contains(
             pattern,
@@ -335,10 +359,10 @@ def review_assays(
         else:
             selected_assays = assay_info[mask]
         unique_selected_assays = len(selected_assays.value_counts())
-        print(
+        _print(
             f"Displaying {min(unique_selected_assays, max_entries)} of {unique_selected_assays} filtered assays.\n",
             )
-        print(selected_assays.value_counts().head(n=max_entries))
+        _print(selected_assays.value_counts().head(n=max_entries))
         selected_id_list = selected_assays.loc[:, "assay_chembl_id"].unique().tolist()  # type: ignore
         return selected_id_list
 
@@ -356,13 +380,13 @@ def filter_by_assay(
     Returns:
         pd.DataFrame:
     """
-    print(f"dataframe initial size: {activity_df.shape[0]}")
+    _print(f"dataframe initial size: {activity_df.shape[0]}")
     filtered_activity_df = activity_df.loc[
         activity_df["assay_chembl_id"].isin(assay_ids)
     ]
-    print(f"dataframe filtered size: {filtered_activity_df.shape[0]}")
+    _print(f"dataframe filtered size: {filtered_activity_df.shape[0]}")
     if filtered_activity_df.empty:
-        print("filtration emptied dataframe, returning original dataframe")
+        _print("filtration emptied dataframe, returning original dataframe")
         return activity_df
     else:
         return filtered_activity_df
@@ -418,37 +442,37 @@ def preprocess_data(
     return activity_df
 
 
-def calculate_fingerprint(
+def calculate_finger_print(
     activity_df: pd.DataFrame,
     smiles_col="canonical_smiles",
-    fingerprint: str | list[str] = "pubchem",
+    finger_print: str | list[str] = "pubchem",
     remove_low_variance: bool = False,
     low_variance_threshold: float = 0.0,
     ) -> pd.DataFrame:
     # TODO: generalizar para demais descritores
-    fingerprint_dict = {
-        "atompairs2d"      : "fingerprint/AtomPairs2DFingerprinter.xml",
-        "atompairs2dcount" : "fingerprint/AtomPairs2DFingerprintCount.xml",
-        "estate"           : "fingerprint/EStateFingerprinter.xml",
-        "extended"         : "fingerprint/ExtendedFingerprinter.xml",
-        "fingerprinter"    : "fingerprint/Fingerprinter.xml",
-        "graphonly"        : "fingerprint/GraphOnlyFingerprinter.xml",
-        "klekota"          : "fingerprint/KlekotaRothFingerprinter.xml",
-        "klekotacount"     : "fingerprint/KlekotaRothFingerprintCount.xml",
-        "maccs"            : "fingerprint/MACCSFingerprinter.xml",
-        "pubchem"          : "fingerprint/PubchemFingerprinter.xml",
-        "substructure"     : "fingerprint/SubstructureFingerprinter.xml",
-        "substructurecount": "fingerprint/SubstructureFingerprintCount.xml",
+    finger_print_dict = {
+        "atompairs2d"      : "finger_print/AtomPairs2DFinger_printer.xml",
+        "atompairs2dcount" : "finger_print/AtomPairs2DFinger_printCount.xml",
+        "estate"           : "finger_print/EStateFinger_printer.xml",
+        "extended"         : "finger_print/ExtendedFinger_printer.xml",
+        "finger_printer"    : "finger_print/Finger_printer.xml",
+        "graphonly"        : "finger_print/GraphOnlyFinger_printer.xml",
+        "klekota"          : "finger_print/KlekotaRothFinger_printer.xml",
+        "klekotacount"     : "finger_print/KlekotaRothFinger_printCount.xml",
+        "maccs"            : "finger_print/MACCSFinger_printer.xml",
+        "pubchem"          : "finger_print/PubchemFinger_printer.xml",
+        "substructure"     : "finger_print/SubstructureFinger_printer.xml",
+        "substructurecount": "finger_print/SubstructureFinger_printCount.xml",
         }
 
-    if type(fingerprint) == str:
-        fingerprint = [fingerprint]
+    if type(finger_print) == str:
+        finger_print = [finger_print]
 
     descriptors_df = pd.DataFrame(index=activity_df.index)
 
-    for i in fingerprint:
-        fingerprint_path = fingerprint_dict[i]
-        mmm.calculate_fingerprint(dataframe=activity_df, smiles_col=smiles_col, fingerprint=fingerprint_path)
+    for i in finger_print:
+        finger_print_path = finger_print_dict[i]
+        mmm.calculate_finger_print(dataframe=activity_df, smiles_col=smiles_col, finger_print=finger_print_path)
         descriptors_df_i = pd.read_csv("descriptors.csv")
         descriptors_df_i = descriptors_df_i.drop("Name", axis=1)
         descriptors_df_i = pd.DataFrame(data=descriptors_df_i, index=activity_df.index)
@@ -512,19 +536,19 @@ class DeployDatasetWrapper:
         deploy_data: pd.DataFrame,
         model_features,
         smiles_col: str = 'canonical_smiles',
-        fingerprint: str = 'pubchem',
+        finger_print: str = 'pubchem',
         ):
 
         instance = cls()
         instance.deploy_data = deploy_data
-        instance.prepare_deploy_dataset(model_features=model_features, smiles_col=smiles_col, fingerprint=fingerprint)
+        instance.prepare_deploy_dataset(model_features=model_features, smiles_col=smiles_col, finger_print=finger_print)
         return instance
 
 
     @classmethod
     def from_path(cls, file_path):
         if not os.path.exists(file_path):
-            print("file_path does not exist")
+            _print("file_path does not exist")
         instance = cls()
         instance.deploy_data = pd.read_csv(f"{file_path}/deploy_data.csv")
         instance.deploy_descriptors = pd.read_csv(f"{file_path}/deploy_descriptors.csv")
@@ -546,28 +570,28 @@ class DeployDatasetWrapper:
         self,
         model_features,
         smiles_col: str,
-        fingerprint: str,
+        finger_print: str,
         ):
 
         if smiles_col not in self.deploy_data.columns:
             raise ValueError("could not find smiles column in provided data")
         if self.deploy_descriptors.empty:
-            self.deploy_descriptors = calculate_fingerprint(
+            self.deploy_descriptors = calculate_finger_print(
                 activity_df=self.deploy_data,
                 smiles_col=smiles_col,
-                fingerprint=fingerprint,
+                finger_print=finger_print,
                 )
         else:
-            print('descriptors already calculated')
+            _print('descriptors already calculated')
         try:
             self.deploy_descriptors = self.deploy_descriptors.loc[:, model_features]
         except KeyError as e:
-            print("Failed to align with model features.")
-            print(
+            _print("Failed to align with model features.")
+            _print(
                 "Please, rerun prepare_deploy_dataset method from DeployDatasetWrapper instance with new model_features iterable.",
                 )
-            print(".feature_names_in_ from the model, or .x_train.columns from the dataset wrapper.\n", )
-            print(e)
+            _print(".feature_names_in_ from the model, or .x_train.columns from the dataset wrapper.\n", )
+            _print(e)
 
 
 class MLWrapper:
@@ -614,13 +638,13 @@ class MLWrapper:
                 try:
                     alpha = float(alpha)
                 except ValueError as e:
-                    print("Parameter alpha (quantile) could not be converted to float. Using standard value: 0.5")
+                    _print("Parameter alpha (quantile) could not be converted to float. Using standard value: 0.5")
                 if not 0 < alpha < 1:
                     raise ValueError(
                         "Parameter alpha (quantile) must be a float between 0 and 1, Using standard value: 0.5",
                         )
         except ValueError:
-            print("Could not use provided alpha, using standard value: 0.5")
+            _print("Could not use provided alpha, using standard value: 0.5")
             alpha: float = 0.5
 
         instance._set_scoring(scoring=scoring, alpha=alpha)
@@ -766,15 +790,15 @@ class MLWrapper:
                 )
             param_search.fit(dataset.x_train, dataset.y_train, callbacks=callback)
         except Exception as e:
-            print(f"something went wrong during optimization, check error:\n\n{e}")
+            _print(f"something went wrong during optimization, check error:\n\n{e}")
             exit()
         try:
             self.params = param_search.best_params_
         except AttributeError as e:
-            print(
+            _print(
                 "Best parameters are not defined if no refit method (string with scorer name) is provided.\nCheck resulting param_search to determine best parameters, or rerun with refit method\n\n",
                 )
-            print(e)
+            _print(e)
         return param_search
 
 
@@ -794,7 +818,7 @@ class MLWrapper:
         elif self.params != {}:
             _algorithm = self.algorithm.set_params(**self.params)
         else:
-            print("no provided parameters, using standard algorithm")
+            _print("no provided parameters, using standard algorithm")
             _algorithm = self.algorithm
 
         cv_results = cross_validate(
@@ -824,7 +848,7 @@ class MLWrapper:
         elif self.params != {}:
             _algorithm = self.algorithm.set_params(**self.params)
         else:
-            print("no provided parameters, using standard algorithm")
+            _print("no provided parameters, using standard algorithm")
             _algorithm = self.algorithm
 
         fit_model = _algorithm.fit(X=dataset.x_train, y=dataset.y_train)
@@ -846,10 +870,10 @@ class MLWrapper:
         # dominio aplicabilidade
 
         if self.fit_model is None:
-            print('model not fit lol, go fit your model with fit()')
+            _print('model not fit lol, go fit your model with fit()')
             return None
         if deploy_dataset.deploy_descriptors.empty:
-            print(
+            _print(
                 'deployment dataset provided does not contain descriptors, go set it up with prepare_dataset() or prepare_deploy_dataset() functions',
                 )
             return None
@@ -857,7 +881,7 @@ class MLWrapper:
         prediction = self.fit_model.predict(deploy_dataset.deploy_descriptors)
         deploy_dataset.prediction = prediction
         if len(prediction) != deploy_dataset.deploy_data.shape[0]:
-            print("prediction shape does not match deploy_data.shape. Check descriptors for missing values.")
+            _print("prediction shape does not match deploy_data.shape. Check descriptors for missing values.")
         else:
             deploy_dataset.deploy_data.loc[:, f'{self.algorithm_name}_prediction'] = prediction
 
@@ -894,7 +918,7 @@ class MLWrapper:
         elif isinstance(algorithm, BaseEstimator):
             self.algorithm = algorithm
             self.algorithm_name = algorithm.__class__.__name__
-            print(
+            _print(
                 "package functionality might not work properly with external algorithms",
                 )
         else:
@@ -941,8 +965,8 @@ class MLWrapper:
                     scorer = available_scorers[scoring_name]
                     scoring_dict[scoring_name] = scorer
                 except KeyError as e:
-                    print(f"{scoring_name} is not available as a scoring metric")
-                    print(e)
+                    _print(f"{scoring_name} is not available as a scoring metric")
+                    _print(e)
             if scoring_dict == {}:
                 raise ValueError("No valid scoring metrics found from the provided list.")
             self.scoring = scoring_dict
