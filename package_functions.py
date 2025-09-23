@@ -1,7 +1,10 @@
 import os
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
+import statsmodels.api as sm
 from chembl_webresource_client.new_client import new_client
 from padelpy import padeldescriptor
 from sklearn.base import BaseEstimator
@@ -59,218 +62,6 @@ def print_high(input_string) -> None:
     global verbosity
     if verbosity == 2:
         print(input_string)
-
-
-class DatasetWrapper:
-
-    def __init__(
-        self,
-        general_data=pd.DataFrame(),
-        x_train=pd.DataFrame(),
-        x_test=pd.DataFrame(),
-        y_train=pd.DataFrame(),
-        y_test=pd.DataFrame(),
-        x_preprocessing=pd.DataFrame(),
-        y_preprocessing=pd.DataFrame(),
-        ):
-        """
-        Initializes the DatasetWrapper with optional dataframes.
-        """
-        self.general_data = general_data
-        self.x_train = x_train
-        self.x_test = x_test
-        self.y_train = y_train
-        self.y_test = y_test
-        self.x_preprocessing = x_preprocessing
-        self.y_preprocessing = y_preprocessing
-
-
-    @classmethod
-    def from_path(cls, file_path):
-        instance = cls()
-        try:
-            print_low(f"Loading DatasetWrapper object from {file_path}")
-            instance._load_from_path(file_path=file_path)
-            print_low(f"DatasetWrapper object loaded from {file_path}")
-            print_high(f"Dataset size: {instance.general_data.shape[0]}")
-            print_high(f"Train subset size: {len(instance.y_train)}")
-            print_high(f"Test shape: {len(instance.y_test)}")
-            print_high(f"Number of features: {instance.x_test.shape[1]}")
-        except Exception as e:
-            print("Dataset loading failed")
-            raise e
-        return instance
-
-
-    @classmethod
-    def from_dataframe(
-        cls,
-        full_df: pd.DataFrame,
-        target_column: str,
-        nonfeature_columns,
-        use_structural_split: bool,
-        holdout_size: float,
-        random_state: int,
-        ):
-        instance = cls()
-        print_low("Loading DatasetWrapper object from unsplit dataframe and splitting data.")
-        print_high(f"Target column: '{target_column}'")
-        print_high(f"Holdout size: {holdout_size}")
-        print_high(f"Using structural split: {use_structural_split}")
-        print_high(f"Random state: {random_state}")
-        try:
-            instance._load_unsplit_dataframe(
-                full_df=full_df,
-                target_column=target_column,
-                nonfeature_columns=nonfeature_columns,
-                use_structural_split=use_structural_split,
-                holdout_size=holdout_size,
-                random_state=random_state,
-                )
-        except Exception as e:
-            print("Dataset loading failed")
-            raise e
-        print_low(f"DatasetWrapper object loaded from unsplit DataFrame and split into train/test sets")
-        print_high(f"Dataset size: {instance.general_data.shape[0]}")
-        print_high(f"Train subset size: {len(instance.y_train)}")
-        print_high(f"Test shape: {len(instance.y_test)}")
-        print_high(f"Number of features: {instance.x_test.shape[1]}")
-        return instance
-
-
-    def subset_general_data(self, train_subset: bool = True) -> pd.DataFrame:
-        """
-        Retrieves the corresponding rows from general_data for the train or test dataset.
-
-        Args:
-            train_subset (bool): Indicates whether to subset train or test values. Default value is True.
-
-        Returns:
-            pd.DataFrame: Rows from general_data corresponding to the specified subset.
-        """
-        subset_type = "train" if train_subset else "test"
-        print_high(f"Subsetting general_data for the {subset_type} set.")
-        if train_subset:
-            return self.general_data.loc[self.x_train.index]
-        else:
-            return self.general_data.loc[self.x_test.index]
-
-
-    def to_path(self, file_path) -> None:
-        """
-        Saves the entire dataset to CSV files inside file_path folder.
-        """
-
-        if not os.path.exists(file_path):
-            os.makedirs(file_path)
-            print_high(f"Creating directory: {file_path}")
-
-        print_low(f"Saving dataset to {file_path} folder")
-        self.general_data.to_csv(f"{file_path}/general_data.csv", index_label="index")
-        print_high(f"Saved general_data to {file_path}/general_data.csv")
-        self.x_train.to_csv(f"{file_path}/x_train.csv", index_label="index")
-        print_high(f"Saved x_train to {file_path}/x_train.csv")
-        self.x_test.to_csv(f"{file_path}/x_test.csv", index_label="index")
-        print_high(f"Saved x_test to {file_path}/x_test.csv")
-        self.y_train.to_csv(f"{file_path}/y_train.csv", index_label="index")
-        print_high(f"Saved y_train to {file_path}/y_train.csv")
-        self.y_test.to_csv(f"{file_path}/y_test.csv", index_label="index")
-        print_high(f"Saved y_test to {file_path}/y_test.csv")
-        print_low(f"Dataset saved to {file_path} folder")
-
-
-    def _load_from_path(self, file_path) -> None:
-        """
-        Loads the dataset from CSV files inside file_path folder.
-        """
-        self.general_data = pd.read_csv(f"{file_path}/general_data.csv", index_col="index")
-        self.x_train = pd.read_csv(f"{file_path}/x_train.csv", index_col="index")
-        self.x_test = pd.read_csv(f"{file_path}/x_test.csv", index_col="index")
-        self.y_train = pd.read_csv(f"{file_path}/y_train.csv", index_col="index")[
-            "neg_log_value"
-        ]
-        self.y_test = pd.read_csv(f"{file_path}/y_test.csv", index_col="index")[
-            "neg_log_value"
-        ]
-
-
-    def _load_unsplit_dataframe(
-        self,
-        full_df: pd.DataFrame,
-        target_column: str,
-        nonfeature_columns,
-        use_structural_split: bool,
-        holdout_size: float,
-        random_state: int,
-        ) -> None:
-        """
-        Loads an unsplit dataframe containing all columns and splits it into
-        general_data, x_train/test, and y_train/test.
-
-        Args:
-            full_df (pandas.DataFrame): Unsplit dataframe containing the dataset.
-            target_column (str): Column name representing the target variable.
-            nonfeature_columns: Columns representing nonfeature variables.
-            use_structural_split (bool): Whether to use structural splitting or not.
-            holdout_size (float): Proportion of the dataset to include in the test split. Standard value = 0.2.
-            random_state (int): Random state for reproducibility. Standard value = 42.
-        """
-
-        self.general_data = full_df[nonfeature_columns]
-        features = full_df.drop(columns=nonfeature_columns)
-        target = full_df[target_column]
-        if use_structural_split:
-            train_index, test_index = mlm.scaffold_split(
-                activity_df=self.general_data,
-                test_size=holdout_size,
-                )
-            self.x_train = features.loc[train_index]
-            self.x_test = features.loc[test_index]
-            self.y_train = target.loc[train_index]
-            self.y_test = target.loc[test_index]
-        else:
-            self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(
-                features,
-                target,
-                train_size=holdout_size,
-                random_state=random_state,
-                )
-        # Create preprocessing dataset
-
-
-    def _create_preprocessing_dataset(
-        self,
-        random_state,
-        preprocessing_size=7500,
-        ) -> None:
-        """
-        Creates a preprocessing dataset by sampling from the train dataset.
-        If the train dataset is larger max_samples, it samples this amount of samples (default: 7500).
-        Otherwise, it uses the entire train dataset.
-
-        Args:
-            random_state (int): Random state to use for splitting the dataset.
-            preprocessing_size (int): Number of samples to use for preprocessing if the train dataset is large.
-        """
-        if len(self.x_train) > preprocessing_size:
-            self.x_preprocessing = self.x_train.sample(
-                n=preprocessing_size,
-                random_state=random_state,
-                )
-            self.y_preprocessing = self.y_train.loc[self.x_preprocessing.index]
-            print_low(f"Preprocessing dataset created with {preprocessing_size} samples.")
-        else:
-            self.x_preprocessing = self.x_train
-            self.y_preprocessing = self.y_train
-            print_low("Preprocessing dataset uses the entire train dataset.")
-
-
-    def describe(self) -> None:
-
-        print(f"Dataset size: {self.general_data.shape[0]}")
-        print(f"Train subset size: {len(self.y_train)}")
-        print(f"Test shape: {len(self.y_test)}")
-        print(f"Number of features: {self.x_test.shape[1]}")
 
 
 def get_activity_data(
@@ -510,7 +301,9 @@ def calculate_fingerprint(
     ) -> pd.DataFrame:
     # TODO: generalizar para demais descritores
     print_low("Starting fingerprint calculation.")
-    print_high("This will create temporary files in this folder: descriptors.csv; descriptors.csv.log and molecules.smi")
+    print_high(
+        "This will create temporary files in this folder: descriptors.csv; descriptors.csv.log and molecules.smi",
+        )
     fingerprint_dict = {
         "atompairs2d"      : "fingerprint/AtomPairs2Dfingerprinter.xml",
         "atompairs2dcount" : "fingerprint/AtomPairs2DfingerprintCount.xml",
@@ -556,30 +349,391 @@ def calculate_fingerprint(
     return descriptors_df
 
 
-def assemble_dataset(
-    activity_df: pd.DataFrame,
-    descriptors_df: pd.DataFrame,
-    target_column: str = "neg_log_value",
-    use_structural_split: bool = True,
-    holdout_size: float = 0.2,
-    random_state: int = 42,
-    preprocessing_size: int = 7500,
-    ) -> DatasetWrapper:
-    print_low("Assembling dataset.")
-    nonfeature_columns = activity_df.columns
-    dataset_df = pd.concat([activity_df, descriptors_df], axis=1)
-    dataset = DatasetWrapper.from_dataframe(
-        full_df=dataset_df,
-        target_column=target_column,
-        nonfeature_columns=nonfeature_columns,
-        use_structural_split=use_structural_split,
-        holdout_size=holdout_size,
-        random_state=random_state,
-        preprocessing_size=preprocessing_size,
-        )
-    print_low("Dataset assembled.")
+class DatasetWrapper:
 
-    return dataset
+    def __init__(
+        self,
+        general_data=pd.DataFrame(),
+        x_train=pd.DataFrame(),
+        x_test=pd.DataFrame(),
+        y_train=pd.Series(),
+        y_test=pd.Series(),
+        ):
+        """
+        Initializes the DatasetWrapper with optional dataframes.
+        """
+        self.general_data = general_data
+        self.x_train = x_train
+        self.x_test = x_test
+        self.y_train = y_train
+        self.y_test = y_test
+
+
+    @classmethod
+    def from_path(cls, file_path, target_col: str = "neg_log_value"):
+        instance = cls()
+        try:
+            print_low(f"Loading DatasetWrapper object from {file_path}")
+            instance._load_from_path(file_path=file_path, target_col=target_col)
+            print_low(f"DatasetWrapper object loaded from {file_path}")
+            print_high(f"Dataset size: {instance.general_data.shape[0]}")
+            print_high(f"Train subset size: {len(instance.y_train)}")
+            print_high(f"Test shape: {len(instance.y_test)}")
+            print_high(f"Number of features: {instance.x_test.shape[1]}")
+        except Exception as e:
+            print("Dataset loading failed")
+            raise e
+        return instance
+
+
+    @classmethod
+    def from_dataframe(
+        cls,
+        activity_df: pd.DataFrame,
+        descriptors_df: pd.DataFrame,
+        target_column: str = "neg_log_value",
+        use_structural_split: bool = True,
+        holdout_size: float = 0.2,
+        random_state: int = 42,
+        ):
+        """Creates a DatasetWrapper object from activity_df and descriptors_df obtained from other functions in the pipeline"""
+        instance = cls()
+        nonfeature_columns = activity_df.columns
+        full_df = pd.concat([activity_df, descriptors_df], axis=1)
+        print_low("Loading DatasetWrapper object from unsplit dataframes and splitting data.")
+        print_high(f"Target column: '{target_column}'")
+        print_high(f"Holdout size: {holdout_size}")
+        print_high(f"Using structural split: {use_structural_split}")
+        print_high(f"Random state: {random_state}")
+        try:
+            instance._load_unsplit_dataframe(
+                full_df=full_df,
+                target_column=target_column,
+                nonfeature_columns=nonfeature_columns,
+                use_structural_split=use_structural_split,
+                holdout_size=holdout_size,
+                random_state=random_state,
+                )
+        except Exception as e:
+            print("Dataset loading failed.")
+            raise e
+        print_low(f"DatasetWrapper object loaded from unsplit DataFrames and split into train/test sets.")
+        print_high(f"Dataset size: {instance.general_data.shape[0]}")
+        print_high(f"Train subset size: {len(instance.y_train)}")
+        print_high(f"Test shape: {len(instance.y_test)}")
+        print_high(f"Number of features: {instance.x_test.shape[1]}")
+        return instance
+
+
+    def to_path(self, file_path) -> None:
+        """
+        Saves the entire dataset to CSV files inside file_path folder.
+        """
+
+        if not os.path.exists(file_path):
+            os.makedirs(file_path)
+            print_high(f"Creating directory: {file_path}")
+
+        print_low(f"Saving dataset to {file_path} folder")
+        self.general_data.to_csv(f"{file_path}/general_data.csv", index_label="index")
+        print_high(f"Saved general_data to {file_path}/general_data.csv")
+        self.x_train.to_csv(f"{file_path}/x_train.csv", index_label="index")
+        print_high(f"Saved x_train to {file_path}/x_train.csv")
+        self.x_test.to_csv(f"{file_path}/x_test.csv", index_label="index")
+        print_high(f"Saved x_test to {file_path}/x_test.csv")
+        self.y_train.to_csv(f"{file_path}/y_train.csv", index_label="index")
+        print_high(f"Saved y_train to {file_path}/y_train.csv")
+        self.y_test.to_csv(f"{file_path}/y_test.csv", index_label="index")
+        print_high(f"Saved y_test to {file_path}/y_test.csv")
+        print_low(f"Dataset saved to {file_path} folder")
+
+
+    def subset_general_data(self, train_subset: bool = True) -> pd.DataFrame:
+        """
+        Retrieves the corresponding rows from general_data for the train or test dataset.
+
+        Args:
+            train_subset (bool): Indicates whether to subset train or test values. Default value is True.
+
+        Returns:
+            pd.DataFrame: Rows from general_data corresponding to the specified subset.
+        """
+        subset_type = "train" if train_subset else "test"
+        print_high(f"Subsetting general_data for the {subset_type} set.")
+        if train_subset:
+            return self.general_data.loc[self.x_train.index]
+        else:
+            return self.general_data.loc[self.x_test.index]
+
+
+    def describe(self) -> None:
+
+        print(f"Dataset size: {self.general_data.shape[0]}")
+        print(f"Train subset size: {len(self.y_train)}")
+        print(f"Test shape: {len(self.y_test)}")
+        print(f"Number of features: {self.x_test.shape[1]}")
+
+
+    def _load_from_path(self, file_path, target_col: str) -> None:
+        """
+        Loads the dataset from CSV files inside file_path folder.
+        """
+        self.general_data = pd.read_csv(f"{file_path}/general_data.csv", index_col="index")
+        self.x_train = pd.read_csv(f"{file_path}/x_train.csv", index_col="index")
+        self.x_test = pd.read_csv(f"{file_path}/x_test.csv", index_col="index")
+        self.y_train = pd.read_csv(f"{file_path}/y_train.csv", index_col="index")[
+            target_col
+        ]
+        self.y_test = pd.read_csv(f"{file_path}/y_test.csv", index_col="index")[
+            target_col
+        ]
+
+
+    def _load_unsplit_dataframe(
+        self,
+        full_df: pd.DataFrame,
+        target_column: str,
+        nonfeature_columns,
+        use_structural_split: bool,
+        holdout_size: float,
+        random_state: int,
+        ) -> None:
+        """
+        Loads an unsplit dataframe containing all columns and splits it into
+        general_data, x_train/test, and y_train/test.
+
+        Args:
+            full_df (pandas.DataFrame): Unsplit dataframe containing the dataset.
+            target_column (str): Column name representing the target variable.
+            nonfeature_columns: Columns representing nonfeature variables.
+            use_structural_split (bool): Whether to use structural splitting or not.
+            holdout_size (float): Proportion of the dataset to include in the test split. Standard value = 0.2.
+            random_state (int): Random state for reproducibility. Standard value = 42.
+        """
+
+        self.general_data = full_df[nonfeature_columns]
+        features = full_df.drop(columns=nonfeature_columns)
+        target = full_df[target_column]
+        if use_structural_split:
+            train_index, test_index = mlm.scaffold_split(
+                activity_df=self.general_data,
+                test_size=holdout_size,
+                )
+            self.x_train = features.loc[train_index]
+            self.x_test = features.loc[test_index]
+            self.y_train = target.loc[train_index]
+            self.y_test = target.loc[test_index]
+        else:
+            self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(
+                features,
+                target,
+                train_size=holdout_size,
+                random_state=random_state,
+                )
+
+
+class DataExplainer:
+    """
+    A class for performing exploratory data analysis on a dataset.
+
+    It can be initialized from a simple DataFrame or a DatasetWrapper.
+    """
+
+
+    def __init__(self, dataset: DatasetWrapper):
+        """
+        Constructor method to create an explainer from a DatasetWrapper object.
+
+        Note: This will use the training data (x_train, y_train) for analysis, to avoid leaking data from test subset.
+        """
+        self.general_data = dataset.subset_general_data(train_subset=True)
+        self.target = dataset.y_train
+        self.features = dataset.x_train
+
+
+    # --- Univariate Plots ---
+
+    def plot_target_distribution(self) -> plt.Figure:
+        """
+        Generates a histogram and KDE plot of the target variable.
+        """
+        fig, ax = plt.subplots(figsize=(10, 6))
+        sns.histplot(self.target, kde=True, ax=ax, bins=30)
+
+        mean_val = self.target.mean()
+        median_val = self.target.median()
+
+        ax.axvline(mean_val, color='red', linestyle='--', lw=2, label=f'Mean: {mean_val:.2f}')
+        ax.axvline(median_val, color='green', linestyle='-', lw=2, label=f'Median: {median_val:.2f}')
+
+        ax.set_title(f'Distribution of Target: {self.target.name}', fontsize=16)
+        ax.set_xlabel(self.target.name, fontsize=12)
+        ax.set_ylabel('Frequency', fontsize=12)
+        ax.legend()
+        plt.tight_layout()
+        return fig
+
+
+    def plot_lipinski_descriptors(self) -> plt.Figure:
+        """
+        Generates box plots for key Lipinski descriptors.
+        """
+        lipinski_cols = ['MW', 'LogP', 'NumHDonors', 'NumHAcceptors']
+        if not all(col in self.general_data.columns for col in lipinski_cols):
+            raise ValueError("Lipinski columns (MW, LogP, etc.) not found in the data.")
+
+        df_melted = self.general_data[lipinski_cols].melt(var_name='Descriptor', value_name='Value')
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+        sns.boxplot(x='Descriptor', y='Value', data=df_melted, ax=ax)
+
+        ax.set_title('Distribution of Lipinski Descriptors', fontsize=16)
+        ax.set_xlabel('Descriptor', fontsize=12)
+        ax.set_ylabel('Value', fontsize=12)
+        plt.tight_layout()
+        return fig
+
+
+    def plot_ro5_violations_vs_bioactivity(self) -> plt.Figure:
+        """
+        Generates a heatmap of the relative frequency of Rule of 5 violations
+        within each bioactivity class.
+        """
+        required_cols = ['Ro5Violations', 'bioactivity_class']
+        if not all(col in self.general_data.columns for col in required_cols):
+            raise ValueError("Data must contain 'Ro5Violations' and 'bioactivity_class' columns.")
+
+        # Create a cross-tabulation of the counts
+        cross_counts = pd.crosstab(self.general_data['Ro5Violations'], self.general_data['bioactivity_class'])
+
+        # Ensure a consistent column order
+        cross_counts = cross_counts.reindex(columns=['active', 'intermediate', 'inactive'], fill_value=0)
+
+        # Calculate the relative frequency for each column (bioactivity class)
+        # This is a more efficient way to do the calculation from your original script
+        relative_freq = cross_counts / cross_counts.sum(axis=0)
+
+        # Generate the plot
+        fig, ax = plt.subplots(figsize=(8, 7))
+        sns.heatmap(data=relative_freq, annot=True, fmt=".2f", cmap='viridis', ax=ax)
+
+        ax.set_title('Relative Frequency of Ro5 Violations by Bioactivity Class', fontsize=16)
+        ax.set_xlabel('Bioactivity Class', fontsize=12)
+        ax.set_ylabel('Number of Ro5 Violations', fontsize=12)
+        plt.tight_layout()
+        return fig
+
+
+    def plot_lipinski_density(self, lipinski_descriptors: list[str] = None) -> plt.Figure:
+        """
+        Generates overlapping density plots for specified Lipinski descriptors.
+
+        Args:
+            descriptors (Optional[List[str]]): A list of descriptor columns to plot.
+                                               Defaults to ['MW', 'LogP', 'NumHDonors', 'NumHAcceptors'].
+        """
+        if lipinski_descriptors is None:
+            lipinski_descriptors = ['MW', 'LogP', 'NumHDonors', 'NumHAcceptors']
+
+        if not all(col in self.general_data.columns for col in lipinski_descriptors):
+            raise ValueError(f"One or more specified descriptors not found in the data.")
+
+        fig, ax = plt.subplots(figsize=(12, 7))
+
+        for desc in lipinski_descriptors:
+            sns.kdeplot(self.general_data[desc], ax=ax, label=desc, fill=True, alpha=0.2)
+
+        ax.set_title('Density of Lipinski Descriptors', fontsize=16)
+        ax.set_xlabel('Value', fontsize=12)
+        ax.set_ylabel('Density', fontsize=12)
+        ax.legend()
+        plt.tight_layout()
+        return fig
+
+
+    def plot_mw_vs_logp(self) -> plt.Figure:
+        """
+        Generates a scatter plot of Molecular Weight vs. LogP.
+
+        Points are colored by bioactivity class, with lines indicating Ro5 thresholds.
+        """
+        required_cols = ['MW', 'LogP', 'bioactivity_class']
+        if not all(col in self.general_data.columns for col in required_cols):
+            raise ValueError("Data must contain 'MW', 'LogP', and 'bioactivity_class' columns.")
+
+        fig, ax = plt.subplots(figsize=(12, 8))
+        sns.scatterplot(
+            data=self.general_data,
+            x='MW',
+            y='LogP',
+            hue='bioactivity_class',
+            ax=ax,
+            alpha=0.7,
+            s=50,
+            hue_order=['active', 'intermediate', 'inactive'],
+            palette={'active': 'forestgreen', 'intermediate': 'goldenrod', 'inactive': 'firebrick'},
+            )
+
+        # Add Rule of 5 threshold lines
+        ax.axvline(x=500, color='black', linestyle='--', lw=2, label='MW = 500')
+        ax.axhline(y=5, color='black', linestyle=':', lw=2, label='LogP = 5')
+
+        ax.set_title('Molecular Weight vs. LogP', fontsize=16)
+        ax.set_xlabel('Molecular Weight (MW)', fontsize=12)
+        ax.set_ylabel('LogP', fontsize=12)
+        ax.legend(title='Bioactivity Class')
+        plt.tight_layout()
+        return fig
+
+
+    # --- Multivariate Plots ---
+
+    def plot_target_vs_feature(self, feature_name: str) -> plt.Figure:
+        """
+        Generates a plot of the target variable against a single feature.
+
+        - Scatter plot for numeric features.
+        - Box plot for categorical features.
+        """
+        if feature_name not in self.features.columns:
+            raise ValueError(f"Feature '{feature_name}' not found in the data.")
+
+        feature = self.features[feature_name]
+        fig, ax = plt.subplots(figsize=(10, 6))
+
+        # Check if feature is numeric or categorical to decide the plot type
+        if pd.api.types.is_numeric_dtype(feature) and feature.nunique() > 15:
+            sns.scatterplot(x=feature, y=self.target, ax=ax, alpha=0.5)
+            ax.set_title(f'{self.target.name} vs. {feature_name} (Scatter Plot)', fontsize=16)
+        else:
+            sns.boxplot(x=feature, y=self.target, ax=ax)
+            ax.set_title(f'{self.target.name} vs. {feature_name} (Box Plot)', fontsize=16)
+            ax.tick_params(axis='x', rotation=45)
+
+        ax.set_xlabel(feature_name, fontsize=12)
+        ax.set_ylabel(self.target.name, fontsize=12)
+        plt.tight_layout()
+        return fig
+
+
+    def plot_correlation_heatmap(self, top_n: int = 15) -> plt.Figure:
+        """
+        Generates a heatmap of the features most correlated with the target.
+        """
+        numeric_features = self.features.select_dtypes(include=np.number)
+        df_corr = pd.concat([numeric_features, self.target], axis=1).corr()
+
+        # Get the top N features most correlated with the target
+        top_corr_cols = df_corr[self.target.name].abs().sort_values(ascending=False).head(top_n + 1).index
+        top_corr_matrix = df_corr.loc[top_corr_cols, top_corr_cols]
+
+        fig, ax = plt.subplots(figsize=(12, 10))
+        mask = np.triu(np.ones_like(top_corr_matrix, dtype=bool))  # Mask for upper triangle
+        sns.heatmap(top_corr_matrix, annot=True, fmt=".2f", cmap='coolwarm', mask=mask, ax=ax)
+
+        ax.set_title(f'Top {top_n} Features Correlated with {self.target.name}', fontsize=16)
+        plt.tight_layout()
+        return fig
 
 
 class DeployDatasetWrapper:
@@ -664,7 +818,8 @@ class DeployDatasetWrapper:
             print_low(
                 "Please, rerun prepare_deploy_dataset method from DeployDatasetWrapper instance with new model_features iterable.",
                 )
-            print_low("Tip: use feature_names_in_ attribute from the model, or x_train.columns attribute from the dataset wrapper.\n", )
+            print_low(
+                "Tip: use feature_names_in_ attribute from the model, or x_train.columns attribute from the dataset wrapper.\n", )
             print_low(e)
 
 
@@ -890,7 +1045,7 @@ class MLWrapper:
             self.params = param_search.best_params_
         except AttributeError as e:
             print("Best parameters were not defined because no refit method (string with scorer name) was provided.")
-            print_low("Check resulting param_search to determine best parameters, or rerun with refit method",)
+            print_low("Check resulting param_search to determine best parameters, or rerun with refit method", )
             print(e)
         return param_search
 
@@ -919,7 +1074,7 @@ class MLWrapper:
         print_high(f"Model parameters for CV: {_algorithm.get_params()}")
         cv_results = cross_validate(
             estimator=_algorithm,
-            X=dataset.x_train,
+            x=dataset.x_train,
             y=dataset.y_train,
             cv=cv,
             scoring=self.scoring,
@@ -951,15 +1106,10 @@ class MLWrapper:
             _algorithm = self.algorithm
 
         print_high(f"Final model parameters: {_algorithm.get_params()}")
-        fit_model = _algorithm.fit(X=dataset.x_train, y=dataset.y_train)
+        fit_model = _algorithm.fit(x=dataset.x_train, y=dataset.y_train)
         self.fit_model = fit_model
         print_low("Model fitting complete.")
         return fit_model
-
-
-    def residue_diagnosis(self):
-
-        return
 
 
     def deploy(
@@ -1089,6 +1239,152 @@ class MLWrapper:
         # if check_params:
         #     if self.params == {}:
         #         raise ValueError("define params using setup()")
+
+
+class ModelExplainer:
+    """
+    A class for explaining and diagnosing a fitted machine learning model.
+    """
+
+
+    def __init__(self, fit_model: BaseEstimator, dataset: DatasetWrapper, algorithm_name: str = None):
+        """
+        Initializes the explainer with a fitted model, DatasetWrapper object and optionally, algorithm_name.
+        """
+        self.model = fit_model
+        self.dataset = dataset
+        self.algorithm_name = fit_model.__class__.__name__ if algorithm_name is None else algorithm_name
+
+        # Pre-calculate common values to use in all plots
+        self.y_true = self.dataset.y_test
+        self.y_pred = self.model.predict(self.dataset.x_test)
+        self.residuals = self.y_true - self.y_pred
+
+        # Pre-calculate studentized residuals for advanced plots
+        try:
+            ols_model = sm.OLS(self.y_true, sm.add_constant(self.dataset.x_test)).fit()
+            influence = ols_model.get_influence()
+            self.residuals_std = influence.resid_studentized_internal
+        except Exception:
+            self.residuals_std = (self.residuals - self.residuals.mean()) / self.residuals.std()
+
+
+    def plot_residuals_vs_fitted(self) -> plt.Figure:
+        """Generates a Residuals vs. Fitted plot.
+
+        Returns:
+            plt.Figure: The Matplotlib Figure object for the plot."""
+        fig, ax = plt.subplots(figsize=(8, 7))
+        # ... (plotting code from the previous _plot helper) ...
+        sns.residplot(
+            x=self.y_pred, y=self.residuals, lowess=True, ax=ax,
+            scatter_kws={'alpha': 0.5},
+            line_kws={'color': 'red', 'lw': 2, 'label': 'Trend'},
+            )
+        ax.set_title('Residuals vs. Fitted Values', fontsize=14)
+        ax.set_xlabel('Fitted Values (y_pred)', fontsize=12)
+        ax.set_ylabel('Residuals', fontsize=12)
+        ax.legend()
+        plt.tight_layout()
+        return fig
+
+
+    def plot_qq(self) -> plt.Figure:
+        """Generates a Normal Q-Q plot.
+
+        Returns:
+            plt.Figure: The Matplotlib Figure object for the plot."""
+        fig, ax = plt.subplots(figsize=(8, 7))
+        # ... (plotting code from the previous _plot helper) ...
+        sm.qqplot(self.residuals, line='s', ax=ax, alpha=0.5)
+        ax.lines[1].set_color('red')
+        ax.lines[1].set_linewidth(2)
+        ax.set_title('Normal Q-Q Plot', fontsize=14)
+        plt.tight_layout()
+        return fig
+
+
+    def plot_scale_location(self) -> plt.Figure:
+        """
+        Generates a Scale-Location plot to check for homoscedasticity.
+
+        Returns:
+            plt.Figure: The Matplotlib Figure object for the plot.
+        """
+        fig, ax = plt.subplots(figsize=(8, 7))
+        sqrt_std_resid = np.sqrt(np.abs(self.residuals_std))
+        sns.scatterplot(x=self.y_pred, y=sqrt_std_resid, ax=ax, alpha=0.5)
+        sns.regplot(
+            x=self.y_pred, y=sqrt_std_resid, scatter=False, lowess=True, ax=ax,
+            line_kws={'color': 'red', 'lw': 2, 'label': 'Trend'},
+            )
+        ax.set_title('Scale-Location Plot', fontsize=14)
+        ax.set_xlabel('Fitted Values', fontsize=12)
+        ax.set_ylabel('$\\sqrt{|Standardized \, Residuals|}$', fontsize=12)
+        ax.legend()
+        plt.tight_layout()
+        return fig
+
+
+    def plot_actual_vs_predicted(self) -> plt.Figure:
+        """
+        Generates an Actual vs. Predicted plot to assess model accuracy.
+
+        Returns:
+            plt.Figure: The Matplotlib Figure object for the plot.
+        """
+        fig, ax = plt.subplots(figsize=(8, 7))
+        sns.scatterplot(x=self.y_true, y=self.y_pred, ax=ax, alpha=0.6)
+        sns.regplot(
+            x=self.y_true, y=self.y_pred, scatter=False, lowess=True, ax=ax,
+            line_kws={'color': 'red', 'lw': 2, 'label': 'Trend'},
+            )
+        # Expected line (perfect prediction)
+        limits = [
+            min(ax.get_xlim()[0], ax.get_ylim()[0]),
+            max(ax.get_xlim()[1], ax.get_ylim()[1]),
+            ]
+        ax.plot(limits, limits, color='black', linestyle='--', lw=2, label='Perfect Fit (y_true=y_pred)')
+        ax.set_title('Actual vs. Predicted Values', fontsize=14)
+        ax.set_xlabel('Actual Values (y_true)', fontsize=12)
+        ax.set_ylabel('Predicted Values (y_pred)', fontsize=12)
+        ax.legend()
+        plt.tight_layout()
+        return fig
+
+
+    def plot_residuals_by_id(self, top_n: int = 30) -> plt.Figure:
+        """
+        Generates a bar plot of the top N largest absolute residuals.
+
+        Args:
+            top_n (int): The number of top residuals to display.
+
+        Returns:
+            plt.Figure: The Matplotlib Figure object for the plot.
+        """
+        fig, ax = plt.subplots(figsize=(10, 8))
+        abs_residuals = np.abs(self.residuals).sort_values(ascending=False).head(top_n)
+        ids = [str(i) for i in abs_residuals.index]  # Ensure IDs are strings
+        sns.barplot(x=ids, y=abs_residuals.values, ax=ax, color='lightcoral')
+        ax.axhline(0, color='black', lw=1)
+        ax.set_title(f'Top {top_n} Absolute Residuals by ID', fontsize=14)
+        ax.set_xlabel('Sample ID / Index', fontsize=12)
+        ax.set_ylabel('Absolute Residual', fontsize=12)
+        ax.tick_params(axis='x', rotation=90)
+        plt.tight_layout()
+        return fig
+
+
+    # TODO: add model explainers such as shap
+    def plot_shap_summary(self):
+        """(Future) Generates a SHAP summary plot."""
+        print("SHAP functionality not yet implemented.")
+        # import shap
+        # explainer = shap.TreeExplainer(self.model)
+        # shap_values = explainer.shap_values(self.dataset.x_test)
+        # shap.summary_plot(shap_values, self.dataset.x_test)
+        pass
 
 # classificação x regressão
 # implementação em dataset externo com AD

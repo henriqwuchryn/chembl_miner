@@ -1,21 +1,18 @@
 import os
 import pickle
 import sys
-import time
-import re
+
 import numpy as np
 import pandas as pd
-import miscelanneous_methods as mm
-import machine_learning_methods as mlm
-from dataset_wrapper import DatasetWrapper
-from sklearn_genetic.space import Categorical, Integer, Continuous
-import joblib
-from sklearn.ensemble import *
-import sklearn.preprocessing as preproc
-from xgboost import XGBRegressor
-from lightgbm import LGBMRegressor
 import sklearn.metrics as metrics
 import sklearn.model_selection as model_selection
+from sklearn.ensemble import *
+from xgboost import XGBRegressor
+
+import machine_learning_methods as mlm
+import miscelanneous_methods as mm
+from dataset_wrapper import DatasetWrapper
+
 
 random_state = 42
 
@@ -26,8 +23,8 @@ try:
 except:
     print(
         """\nyou must insert the dataset filename as an argument, like this:
->python ml_analysis.py FILENAME"""
-    )
+>python ml_analysis.py FILENAME""",
+        )
     quit()
 
 results_path = f"analysis/{filename}"
@@ -51,7 +48,7 @@ general_columns = [
     "NumHAcceptors",
     "Ro5Violations",
     "bioactivity_class",
-]
+    ]
 target_column = "neg_log_value"
 
 # Available algorithms
@@ -62,20 +59,20 @@ algorithms: dict = {
     3: (
         "GradientBoostingRegressor",
         GradientBoostingRegressor(random_state=random_state),
-    ),
+        ),
     4: (
         "HistGradientBoostingRegressor",
         HistGradientBoostingRegressor(random_state=random_state),
-    ),
+        ),
     5: ("RandomForestRegressor", RandomForestRegressor(random_state=random_state)),
     6: ("XGBRegressor", XGBRegressor(random_state=random_state)),
-}
+    }
 print(
-    f"\n{pd.DataFrame([(value[0]) for key, value in algorithms.items()],columns=['Algorithm'],index=algorithms.keys())}\n"
-)
+    f"\n{pd.DataFrame([(value[0]) for key, value in algorithms.items()], columns=['Algorithm'], index=algorithms.keys())}\n",
+    )
 algorithm_index: str = input(
-    "Choose which algorithm to use by inserting the index. 0 for all.\n"
-)
+    "Choose which algorithm to use by inserting the index. 0 for all.\n",
+    )
 algorithm_index = mm.check_if_int(algorithm_index)
 
 if algorithm_index != 0:
@@ -91,8 +88,8 @@ if algorithm_index != 0:
 else:
     optimize = 1  # if all algorithms were selected, there is only optimization
     confirmation = input(
-        "\nAre you sure you want to use all algorithms? Only available for optimization. 1 or 0\n"
-    )
+        "\nAre you sure you want to use all algorithms? Only available for optimization. 1 or 0\n",
+        )
     confirmation = mm.check_if_int(confirmation)
     if confirmation == 1:
         print("\nAll algorithms will be used")
@@ -106,14 +103,14 @@ scoring = {  # defining scoring metrics for optimization
     #        lambda y_true, y_pred: metrics.root_mean_squared_error(y_true, y_pred)),
     #    'mae': metrics.make_scorer(metrics.mean_absolute_error),
     "quantile": metrics.make_scorer(
-        lambda y_true, y_pred: metrics.mean_pinball_loss(y_true, y_pred, alpha=0.9)
-    ),
-}
+        lambda y_true, y_pred: metrics.mean_pinball_loss(y_true, y_pred, alpha=0.9),
+        ),
+    }
 
 if not os.path.exists(f"{datasets_path}/gd.csv"):
     data = DatasetWrapper().load_raw_dataset(
-        f"{datasets_folder}/{filename}.csv", general_columns, target_column
-    )
+        f"{datasets_folder}/{filename}.csv", general_columns, target_column,
+        )
     data.to_path(datasets_path)
 else:
     data = DatasetWrapper().load_dataset(datasets_path)
@@ -156,18 +153,18 @@ if optimize == 1:
                 generations=gen,
                 population_size=pop,
                 refit="quantile",
-            )
+                )
             search_output_filename = mm.generate_unique_filename(
-                results_path, name, "paramsearch"
-            )
+                results_path, name, "paramsearch",
+                )
             search_txtoutput_filename = mm.generate_unique_filename(
-                results_path, name, "bestparams", "time", suffix=".txt"
-            )
+                results_path, name, "bestparams", "time", suffix=".txt",
+                )
             search_cv_results.to_csv(search_output_filename)
             with open(search_txtoutput_filename, "w") as file:
                 file.write(
-                    f"Evaluated parameters: {mlm.describe_params(params)}\nBest parameters: {str(best_params)}\nTime to run: {time}\n"
-                )  # writing parameters to text file
+                    f"Evaluated parameters: {mlm.describe_params(params)}\nBest parameters: {str(best_params)}\nTime to run: {time}\n",
+                    )  # writing parameters to text file
         print(f"\nOptimization completed. Results saved to {search_output_filename}.")
         quit()  # following code only supports one algorithm at a time
 
@@ -190,28 +187,28 @@ if optimize == 1:
             generations=gen,
             population_size=pop,
             refit="quantile",
-        )
+            )
         search_output_filename = mm.generate_unique_filename(
-            results_path, name, "paramsearch"
-        )
+            results_path, name, "paramsearch",
+            )
         search_txtoutput_filename = mm.generate_unique_filename(
-            results_path, name, "bestparams", "time", suffix=".txt"
-        )
+            results_path, name, "bestparams", "time", suffix=".txt",
+            )
         search_cv_results.to_csv(search_output_filename)
         with open(search_txtoutput_filename, "w") as file:
             file.write(
-                f"Evaluated parameters: {mlm.describe_params(params)}\nBest parameters: {str(best_params)}\nTime to run: {time}\n"
-            )  # writing parameters to text file
+                f"Evaluated parameters: {mlm.describe_params(params)}\nBest parameters: {str(best_params)}\nTime to run: {time}\n",
+                )  # writing parameters to text file
         print(
-            f"\nOptimization completed. Results saved to {search_output_filename}, {search_txtoutput_filename}."
-        )
+            f"\nOptimization completed. Results saved to {search_output_filename}, {search_txtoutput_filename}.",
+            )
 
 try:
     params = best_params
 except:  # if above fails, ask for input
     params = input(
-        f"\nInsert the parameters for the algorithm {name}:\n(You might find some at analysis/(name of your dataset)/)\n"
-    )
+        f"\nInsert the parameters for the algorithm {name}:\n(You might find some at analysis/(name of your dataset)/)\n",
+        )
     try:
         params = dict(eval(params))
     except:
@@ -221,8 +218,8 @@ except:  # if above fails, ask for input
 optimized_algorithm = alg.set_params(**params)
 
 select_features = input(
-    "\nDo you want to select features? 1 or 0.\nYou don't need to select features if your dataset is already a subset of features.\n"
-)
+    "\nDo you want to select features? 1 or 0.\nYou don't need to select features if your dataset is already a subset of features.\n",
+    )
 select_features = mm.check_if_int(select_features)
 
 if select_features == 1:
@@ -234,24 +231,24 @@ if select_features == 1:
         algorithm_name=name,
         population_size=pop,
         generations=gen,
-    )
+        )
     feature_output_filename = mm.generate_unique_filename(
-        results_path, name, "feature_selection"
-    )
+        results_path, name, "feature_selection",
+        )
     feature_txtoutput_filename = mm.generate_unique_filename(
-        results_path, name, "selected_features", "time", suffix=".txt"
-    )
+        results_path, name, "selected_features", "time", suffix=".txt",
+        )
     feature_cv_results.to_csv(feature_output_filename)
     with open(feature_txtoutput_filename, "w") as file:
         file.write(
-            f"Selected features:\n{data.x_preprocessing.columns[sel_feats]}\n\nTime to run: {time} seconds.\n\nIn case you need to filter a dataset for columns, use:\ndataset = dataset[list of selected columns]"
-        )
+            f"Selected features:\n{data.x_preprocessing.columns[sel_feats]}\n\nTime to run: {time} seconds.\n\nIn case you need to filter a dataset for columns, use:\ndataset = dataset[list of selected columns]",
+            )
     print(
-        f"\nFeature selection completed. Results saved to {feature_output_filename}, {feature_txtoutput_filename}"
-    )
+        f"\nFeature selection completed. Results saved to {feature_output_filename}, {feature_txtoutput_filename}",
+        )
     feature_dataset_path = mm.generate_unique_filename(
-        datasets_path, name[0:8], "feat_sel", suffix=""
-    )
+        datasets_path, name[0:8], "feat_sel", suffix="",
+        )
     print(f"Saving dataset with selected features at {feature_dataset_path}")
     data.x_train = data.x_train[data.x_train.columns[sel_feats]]
     data.x_test = data.x_test[data.x_test.columns[sel_feats]]
@@ -261,10 +258,9 @@ if select_features == 1:
 score_dfs = []
 
 outlier_detection = input(
-    "\nDo you want to detect outliers? 1 or 0.\nYou don't need to detect outliers if your dataset was already filtered.\n"
-)
+    "\nDo you want to detect outliers? 1 or 0.\nYou don't need to detect outliers if your dataset was already filtered.\n",
+    )
 outlier_detection = mm.check_if_int(outlier_detection)
-
 
 if outlier_detection == 1:
     print("\nPerforming supervised outlier removal")
@@ -274,20 +270,20 @@ if outlier_detection == 1:
         y_train=data.y_train,
         scoring=scoring,
         algorithm_name=name,
-    )
+        )
     print("Number of samples before cleaning:", data.x_train.shape[0])
     print("Number of samples after cleaning:", x_train_clean.shape[0])
     print(
-        f"Removed {round(((data.x_train.shape[0]-x_train_clean.shape[0])/data.x_train.shape[0]*100),2)}% of samples"
-    )
+        f"Removed {round(((data.x_train.shape[0] - x_train_clean.shape[0]) / data.x_train.shape[0] * 100), 2)}% of samples",
+        )
     outlier_gen_mask = np.logical_not(data.general_data.index.isin(x_train_clean.index))
     outlier_general = data.general_data[outlier_gen_mask]
     outlier_target_mask = np.logical_not(data.x_train.index.isin(x_train_clean.index))
     outlier_target = data.y_train[outlier_target_mask]
     outlier_df = pd.concat([outlier_general, outlier_target], axis=1)
     outlier_dataset_path = mm.generate_unique_filename(
-        datasets_path, name[0:8], "outliers", suffix=""
-    )
+        datasets_path, name[0:8], "outliers", suffix="",
+        )
     print(f"Saving dataset without outliers at {outlier_dataset_path}")
     data.x_train = x_train_clean
     data.y_train = y_train_clean
@@ -303,7 +299,7 @@ if outlier_detection == 1:
         scoring=scoring,
         n_jobs=-1,
         return_train_score=True,
-    )
+        )
     # assembling cv_results_clean dataframe
     cv_score_clean = mlm.get_results(cv_results_clean, "clean")
     score_dfs.extend(cv_score_clean)
@@ -318,7 +314,7 @@ else:
         scoring=scoring,
         n_jobs=-1,
         return_train_score=True,
-    )
+        )
 # assembling cv_results dataframe
 cv_score = mlm.get_results(cv_results)
 score_dfs.extend(cv_score)
@@ -332,8 +328,8 @@ print("\nFitting model with training data")
 model = optimized_algorithm.fit(X=data.x_train, y=data.y_train)
 print("Fitting completed")
 model_output_filename = mm.generate_unique_filename(
-    results_path, name, "model", suffix=".pkl"
-)
+    results_path, name, "model", suffix=".pkl",
+    )
 print(f"Saving fitted model to {model_output_filename}")
 with open(model_output_filename, "wb") as file:
     pickle.dump(model, file)
@@ -342,15 +338,15 @@ test_model = input("\nDo you want to test the model? 1 or 0.\n")
 test_model = mm.check_if_int(test_model)
 if test_model == 1:
     print(
-        "\nEvaluating model with test data.\n\nAttention!\n\nDo not use these results to optimize your model, lest you should leak information from the test data into the model."
-    )
+        "\nEvaluating model with test data.\n\nAttention!\n\nDo not use these results to optimize your model, lest you should leak information from the test data into the model.",
+        )
     y_pred_test = model.predict(data.x_test)
     r2_test = metrics.r2_score(data.y_test, y_pred_test)
     rmse_test = metrics.root_mean_squared_error(data.y_test, y_pred_test)
     mae_test = metrics.mean_absolute_error(data.y_test, y_pred_test)
     score_df_test = pd.DataFrame(
-        {"r2": r2_test, "rmse": rmse_test, "mae": mae_test}, index=["score_test"]
-    )
+        {"r2": r2_test, "rmse": rmse_test, "mae": mae_test}, index=["score_test"],
+        )
     test_output_filename = mm.generate_unique_filename(results_path, name, "test")
     score_df_test.to_csv(test_output_filename)
     print(f"\nTest results are available at {test_output_filename}")

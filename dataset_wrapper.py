@@ -1,8 +1,8 @@
-import pandas as pd
-import pickle
 import os
-import sys
+
+import pandas as pd
 from sklearn.model_selection import train_test_split
+
 
 class DatasetWrapper:
     def __init__(self, general_data=None, x_train=None, x_test=None, y_train=None, y_test=None):
@@ -43,7 +43,7 @@ class DatasetWrapper:
         """
 
         if not os.path.exists(file_path):
-           os.makedirs(file_path)
+            os.makedirs(file_path)
 
         self.general_data.to_csv(f'{file_path}/gd.csv', index_label='index')
         self.x_train.to_csv(f'{file_path}/ftr.csv', index_label='index')
@@ -53,6 +53,7 @@ class DatasetWrapper:
         self.x_preprocessing.to_csv(f'{file_path}/fpr.csv', index_label='index')
         self.y_preprocessing.to_csv(f'{file_path}/tpr.csv', index_label='index')
         print(f"Dataset saved to {file_path}")
+
 
     def load(self, file_path):
         """
@@ -71,6 +72,7 @@ class DatasetWrapper:
         except Exception as e:
             print(e)
             print("Dataset loading failed")
+
 
     def load_unsplit_csv(self, file_path, general_columns, target_column, test_size=0.2, random_state=42):
         """
@@ -99,12 +101,13 @@ class DatasetWrapper:
             print('\nUnsplit CSV file does not contain the correct columns')
         # Split the dataset
         self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(
-            features, target, test_size=test_size, random_state=random_state
-        )
+            features, target, test_size=test_size, random_state=random_state,
+            )
         self.file_path = file_path
         print(f"Unsplit dataset loaded and split into train/test sets from {file_path}")
         # Create preprocessing dataset
         self.create_preprocessing_dataset()
+
 
     def create_preprocessing_dataset(self, max_samples=7500):
         """
@@ -131,9 +134,13 @@ class DatasetWrapper:
         size_train = self.y_train.shape[0]
         size_test = self.y_test.shape[0]
         size_preprocessing = self.y_preprocessing.shape[0]
-        print(f'\nDataset obtained from {self.file_path}\nDataset size: {size}\nNumber of features: {features}\nTrain subset size: {size_train}\nTest subset size: {size_test}')
+        print(
+            f'\nDataset obtained from {self.file_path}\nDataset size: {size}\nNumber of features: {features}\nTrain subset size: {size_train}\nTest subset size: {size_test}',
+            )
         if size_preprocessing != size_train:
-            print('This dataset contains a preprocessing subset of 7500 samples for hyperparameter optimization and feature selection')
+            print(
+                'This dataset contains a preprocessing subset of 7500 samples for hyperparameter optimization and feature selection',
+                )
 
 
     @staticmethod

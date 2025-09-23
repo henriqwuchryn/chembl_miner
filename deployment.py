@@ -1,23 +1,21 @@
 import glob
-import pandas as pd
-import sklearn. preprocessing as preproc
+
 import numpy as np
+import pandas as pd
 import seaborn as sns
+import sklearn.preprocessing as preproc
+
+
 sns.set_theme(style='ticks')
-sns.set_theme(style='whitegrid',font='liberation serif')
-import matplotlib.pyplot as plt
+sns.set_theme(style='whitegrid', font='liberation serif')
 import miscelanneous_methods as mm
 import machine_learning_methods as mlm
 import molecules_manipulation_methods as mmm
-import joblib
-from sklearn.ensemble import *
-from xgboost import XGBRegressor
-from lightgbm import LGBMRegressor
-import sklearn.metrics as metrics
 import os
 import sys
 import pickle
 import re
+
 
 # definition of paths
 try:
@@ -26,9 +24,9 @@ try:
         deploy_filename = deploy_filename[:-4]
 except:
     print(
-            '''\nyou must insert the deployment dataset filename as first argument, like this:
-            >python deployment.py TEST_DATASET_FILENAME.csv model_dataset_filename'''
-            )
+        '''\nyou must insert the deployment dataset filename as first argument, like this:
+        >python deployment.py TEST_DATASET_FILENAME.csv model_dataset_filename''',
+        )
     quit()
 
 try:
@@ -39,9 +37,9 @@ try:
         model_filename = model_filename[:-4]
 except:
     print(
-            '''\nyou must insert the model filename as second argument, like this:
-            >python deployment.py deploy_dataset_filename.csv model_dataset_filename'''
-            )
+        '''\nyou must insert the model filename as second argument, like this:
+        >python deployment.py deploy_dataset_filename.csv model_dataset_filename''',
+        )
     quit()
 
 results_path = f'analysis/{deploy_filename}'
@@ -52,7 +50,9 @@ model_files = glob.glob(f'analysis/{model_filename}/*.pkl')
 model_files.sort()
 model_files_df = pd.DataFrame(model_files)
 print(model_files_df)
-model_index:str = input('\nSelect which model you want to use by inserting the index\nNegative index will use all models\n')
+model_index: str = input(
+    '\nSelect which model you want to use by inserting the index\nNegative index will use all models\n',
+    )
 try:
     model_index = int(model_index)
     if model_index >= 0:
@@ -86,7 +86,7 @@ print(molecules_df.columns)
 re_pattern = r'(.*?)/(.*?)/(.*?).pkl'
 if model_index >= 0:
     try:
-        with open (model_path, 'rb') as file:
+        with open(model_path, 'rb') as file:
             model = pickle.load(file)
     except:
         print('Cannot read model')
@@ -94,16 +94,17 @@ if model_index >= 0:
     feature_mask = np.isin(fingerprint.columns, model_features)
     fingerprint_aligned = fingerprint[fingerprint.columns[feature_mask]]
     y_pred = model.predict(fingerprint_aligned)
-    match = re.search(re_pattern,model_path)
+    match = re.search(re_pattern, model_path)
     y_pred = pd.Series(y_pred, name=f'pIC50_{match.group(2)}_{match.group(3)[:8]}')
     molecules_df = pd.concat([molecules_df, y_pred], axis=1)
     output_filename = mm.generate_unique_filename(
-            results_path, 'deployment', match.group(2), match.group(3)[:8])
+        results_path, 'deployment', match.group(2), match.group(3)[:8],
+        )
 
 if model_index < 0:
     for model_path in model_files:
         try:
-            with open (model_path, 'rb') as file:
+            with open(model_path, 'rb') as file:
                 model = pickle.load(file)
         except:
             print('Cannot read model')
@@ -111,11 +112,12 @@ if model_index < 0:
         feature_mask = np.isin(fingerprint.columns, model_features)
         fingerprint_aligned = fingerprint[fingerprint.columns[feature_mask]]
         y_pred = model.predict(fingerprint_aligned)
-        match = re.search(re_pattern,model_path)
+        match = re.search(re_pattern, model_path)
         y_pred = pd.Series(y_pred, name=f'pIC50_{match.group(2)}_{match.group(3)[:8]}')
         molecules_df = pd.concat([molecules_df, y_pred], axis=1)
         output_filename = mm.generate_unique_filename(
-           results_path, 'deployment', f'{len(model_files)}models')
+            results_path, 'deployment', f'{len(model_files)}models',
+            )
 
 print(molecules_df)
 print(molecules_df.columns)

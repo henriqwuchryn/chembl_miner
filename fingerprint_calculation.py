@@ -1,20 +1,23 @@
-import pandas as pd
 import glob
-import numpy as np
-import miscelanneous_methods as mm
-import molecules_manipulation_methods as mmm
-import machine_learning_methods as mlm
-import sklearn. preprocessing as preproc
 import os
 import sys
+
+import numpy as np
+import pandas as pd
+import sklearn.preprocessing as preproc
+
+import machine_learning_methods as mlm
+import miscelanneous_methods as mm
+import molecules_manipulation_methods as mmm
+
 
 try:
     filename = sys.argv[1]
 except:
     print(
         '''\nPlease insert the dataset filename as an argument, like this:
-    >python exploratory_analysis.py FILENAME.csv'''
-    )
+    >python exploratory_analysis.py FILENAME.csv''',
+        )
     quit()
 
 datasets_path = 'datasets'
@@ -33,9 +36,11 @@ fingerprint_files = glob.glob('fingerprint/*.xml')
 fingerprint_files.sort()
 fingerprint_files_df = pd.DataFrame(fingerprint_files)
 for row in fingerprint_files_df.index:
-    fingerprint_files_df.at[row,0] = fingerprint_files_df.at[row,0][12:-4]
+    fingerprint_files_df.at[row, 0] = fingerprint_files_df.at[row, 0][12:-4]
 print(fingerprint_files_df)
-fingerprint_index:str = input('\nSelect which fingerprint method you want to use by inserting the index\nNegative index will use all fingerprints\n')
+fingerprint_index: str = input(
+    '\nSelect which fingerprint method you want to use by inserting the index\nNegative index will use all fingerprints\n',
+    )
 try:
     fingerprint_index = int(fingerprint_index)
     if fingerprint_index >= 0:
@@ -51,26 +56,26 @@ if os.path.exists('descriptors.csv'):
 
 if reuse != 1:
     if fingerprint_index >= 0:
-            mmm.calculate_fingerprint(activity_df, fingerprint)
+        mmm.calculate_fingerprint(activity_df, fingerprint)
     if fingerprint_index < 0:
         descriptors_df = pd.DataFrame(index=activity_df.index)
         for i in fingerprint_files:
             mmm.calculate_fingerprint(activity_df, i)
             descriptors_df_i = pd.read_csv('descriptors.csv')
-            descriptors_df_i = descriptors_df_i.drop('Name',axis=1)
-            descriptors_df_i = pd.DataFrame(descriptors_df_i,index=activity_df.index)
+            descriptors_df_i = descriptors_df_i.drop('Name', axis=1)
+            descriptors_df_i = pd.DataFrame(descriptors_df_i, index=activity_df.index)
             descriptors_df = pd.concat([descriptors_df, descriptors_df_i], axis=1)
             os.remove('descriptors.csv')
             os.remove('descriptors.csv.log')
         descriptors_df.to_csv('descriptors.csv')
 else:
     print('\nReutilizing descriptors.csv file')
-    fingerprint_index = int(open('fingerprint_used','r').read())
+    fingerprint_index = int(open('fingerprint_used', 'r').read())
 
 descriptors_df = pd.read_csv('descriptors.csv')
 if fingerprint_index >= 0:
-    descriptors_df = descriptors_df.drop('Name',axis=1)
-descriptors_df = pd.DataFrame(descriptors_df,index=activity_df.index)
+    descriptors_df = descriptors_df.drop('Name', axis=1)
+descriptors_df = pd.DataFrame(descriptors_df, index=activity_df.index)
 descriptors_df = mlm.scale_features(descriptors_df, preproc.MinMaxScaler())
 
 select_variance = input('\nType 1 to remove descriptors with low variance\n')
@@ -89,31 +94,35 @@ if select_variance == 1:
     descriptors_df = mm.remove_low_variance_columns(descriptors_df, variance_threshold)
     output_filename = mm.generate_unique_filename(
         datasets_path, filename[:-4],
-        f'fp{fingerprint_index}', f'vt{variance_threshold}')
+        f'fp{fingerprint_index}', f'vt{variance_threshold}',
+        )
 else:
     output_filename = mm.generate_unique_filename(
-        datasets_path, filename[:-4], f'fp{fingerprint_index}')
+        datasets_path, filename[:-4], f'fp{fingerprint_index}',
+        )
 
-fingerprint_df = pd.concat([
-    activity_df,
-    descriptors_df],
-    axis = 1)
+fingerprint_df = pd.concat(
+    [
+        activity_df,
+        descriptors_df,
+        ],
+    axis=1,
+    )
 fingerprint_df.replace([np.inf, -np.inf], np.nan, inplace=True)
 fingerprint_df.dropna(inplace=True)
-print('\n',fingerprint_df)
+print('\n', fingerprint_df)
 fingerprint_df.to_csv(output_filename, index=True, index_label='index')
 print(f'\nResult is avaliable at {output_filename}')
 clean = input('\nType 1 to delete temporary files\nYou can keep them to reutilize descriptors.csv\n')
 clean = mm.check_if_int(clean)
 
-if clean == 1:   
+if clean == 1:
     os.remove('molecules.smi')
     os.remove('descriptors.csv')
     os.remove('descriptors.csv.log')
     os.remove('fingerprint_used')
 else:
-    with open('fingerprint_used','w') as f:
+    with open('fingerprint_used', 'w') as f:
         f.write(str(fingerprint_index))
         f.close()
     print('\nTemporary files kept for reutilization')
-
