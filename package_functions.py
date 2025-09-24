@@ -582,14 +582,15 @@ class DataExplainer:
         if not all(col in self.general_data.columns for col in lipinski_cols):
             raise ValueError("Lipinski columns (MW, LogP, etc.) not found in the data.")
 
-        df_melted = self.general_data[lipinski_cols].melt(var_name='Descriptor', value_name='Value')
+        fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+        axes = axes.flatten()
 
-        fig, ax = plt.subplots(figsize=(10, 6))
-        sns.boxplot(x='Descriptor', y='Value', data=df_melted, ax=ax)
+        for i, col in enumerate(lipinski_cols):
+            sns.boxplot(y=self.general_data[col], ax=axes[i])
+            axes[i].set_title(f'Distribution of {col}', fontsize=14)
+            axes[i].set_ylabel('Value', fontsize=12)
 
-        ax.set_title('Distribution of Lipinski Descriptors', fontsize=16)
-        ax.set_xlabel('Descriptor', fontsize=12)
-        ax.set_ylabel('Value', fontsize=12)
+        plt.suptitle('Distribution of Lipinski Descriptors', fontsize=16, y=1.02)
         plt.tight_layout()
         return fig
 
@@ -629,7 +630,7 @@ class DataExplainer:
         Generates overlapping density plots for specified Lipinski descriptors.
 
         Args:
-            descriptors (Optional[List[str]]): A list of descriptor columns to plot.
+            lipinski_descriptors (list[str]): A list of descriptor columns to plot.
                                                Defaults to ['MW', 'LogP', 'NumHDonors', 'NumHAcceptors'].
         """
         if lipinski_descriptors is None:
@@ -638,15 +639,16 @@ class DataExplainer:
         if not all(col in self.general_data.columns for col in lipinski_descriptors):
             raise ValueError(f"One or more specified descriptors not found in the data.")
 
-        fig, ax = plt.subplots(figsize=(12, 7))
+        fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+        axes = axes.flatten()
 
-        for desc in lipinski_descriptors:
-            sns.kdeplot(self.general_data[desc], ax=ax, label=desc, fill=True, alpha=0.2)
+        for i, desc in enumerate(lipinski_descriptors):
+            sns.kdeplot(self.general_data[desc], ax=axes[i], fill=True, alpha=0.5)
+            axes[i].set_title(f'Density of {desc}', fontsize=14)
+            axes[i].set_xlabel('Value', fontsize=12)
+            axes[i].set_ylabel('Density', fontsize=12)
 
-        ax.set_title('Density of Lipinski Descriptors', fontsize=16)
-        ax.set_xlabel('Value', fontsize=12)
-        ax.set_ylabel('Density', fontsize=12)
-        ax.legend()
+        plt.suptitle('Density of Lipinski Descriptors', fontsize=16, y=1.02)
         plt.tight_layout()
         return fig
 
@@ -1247,7 +1249,7 @@ class ModelExplainer:
     """
 
 
-    def __init__(self, fit_model: BaseEstimator, dataset: DatasetWrapper, algorithm_name: str = None):
+    def __init__(self, fit_model: BaseEstimator, dataset: DatasetWrapper, algorithm_name: str = None, train_subset=True):
         """
         Initializes the explainer with a fitted model, DatasetWrapper object and optionally, algorithm_name.
         """
@@ -1256,13 +1258,20 @@ class ModelExplainer:
         self.algorithm_name = fit_model.__class__.__name__ if algorithm_name is None else algorithm_name
 
         # Pre-calculate common values to use in all plots
-        self.y_true = self.dataset.y_test
-        self.y_pred = self.model.predict(self.dataset.x_test)
+        if train_subset:
+            features = self.dataset.x_train
+            self.y_true = self.dataset.y_train
+            self.y_pred = self.model.predict(features)
+
+        else:
+            features = self.dataset.x_test
+            self.y_true = self.dataset.y_test
+            self.y_pred = self.model.predict(features)
         self.residuals = self.y_true - self.y_pred
 
         # Pre-calculate studentized residuals for advanced plots
         try:
-            ols_model = sm.OLS(self.y_true, sm.add_constant(self.dataset.x_test)).fit()
+            ols_model = sm.OLS(self.y_true, sm.add_constant(features)).fit()
             influence = ols_model.get_influence()
             self.residuals_std = influence.resid_studentized_internal
         except Exception:
