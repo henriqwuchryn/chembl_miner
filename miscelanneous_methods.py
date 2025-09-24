@@ -105,7 +105,7 @@ def treat_duplicates(molecules_df, method: str = 'median') -> pd.DataFrame:
     treated_molecules_df = molecules_df.copy()
     # noinspection PyTypeChecker
     transformed_values = treated_molecules_df.groupby('molecule_chembl_id')['standard_value'].transform(method)
-    treated_molecules_df.loc['standard_value'] = transformed_values
+    treated_molecules_df.loc[:,'standard_value'] = transformed_values
     treated_molecules_df = treated_molecules_df.drop_duplicates(subset='molecule_chembl_id')
     print(f"Filtered DataFrame size: {treated_molecules_df.shape[0]}")
     return treated_molecules_df

@@ -265,8 +265,8 @@ def preprocess_data(
 
 def _calculate_fingerprint(
     activity_df: pd.DataFrame,
+    fingerprint: str,
     smiles_col="canonical_smiles",
-    fingerprint: str | list[str] = "pubchem",
     ) -> pd.DataFrame:
 
     df_smi = activity_df[smiles_col]
@@ -305,18 +305,18 @@ def calculate_fingerprint(
         "This will create temporary files in this folder: descriptors.csv; descriptors.csv.log and molecules.smi",
         )
     fingerprint_dict = {
-        "atompairs2d"      : "fingerprint/AtomPairs2Dfingerprinter.xml",
-        "atompairs2dcount" : "fingerprint/AtomPairs2DfingerprintCount.xml",
-        "estate"           : "fingerprint/EStatefingerprinter.xml",
-        "extended"         : "fingerprint/Extendedfingerprinter.xml",
-        "fingerprinter"    : "fingerprint/fingerprinter.xml",
-        "graphonly"        : "fingerprint/GraphOnlyfingerprinter.xml",
-        "klekota"          : "fingerprint/KlekotaRothfingerprinter.xml",
-        "klekotacount"     : "fingerprint/KlekotaRothfingerprintCount.xml",
-        "maccs"            : "fingerprint/MACCSfingerprinter.xml",
-        "pubchem"          : "fingerprint/Pubchemfingerprinter.xml",
-        "substructure"     : "fingerprint/Substructurefingerprinter.xml",
-        "substructurecount": "fingerprint/SubstructurefingerprintCount.xml",
+        "atompairs2d"      : "fingerprint/AtomPairs2DFingerprinter.xml",
+        "atompairs2dcount" : "fingerprint/AtomPairs2DFingerprintCount.xml",
+        "estate"           : "fingerprint/EStateFingerprinter.xml",
+        "extended"         : "fingerprint/ExtendedFingerprinter.xml",
+        "fingerprinter"    : "fingerprint/Fingerprinter.xml",
+        "graphonly"        : "fingerprint/GraphOnlyFingerprinter.xml",
+        "klekota"          : "fingerprint/KlekotaRothFingerprinter.xml",
+        "klekotacount"     : "fingerprint/KlekotaRothFingerprintCount.xml",
+        "maccs"            : "fingerprint/MACCSFingerprinter.xml",
+        "pubchem"          : "fingerprint/PubchemFingerprinter.xml",
+        "substructure"     : "fingerprint/SubstructureFingerprinter.xml",
+        "substructurecount": "fingerprint/SubstructureFingerprintCount.xml",
         }
 
     if type(fingerprint) == str:
@@ -1074,7 +1074,7 @@ class MLWrapper:
         print_high(f"Model parameters for CV: {_algorithm.get_params()}")
         cv_results = cross_validate(
             estimator=_algorithm,
-            x=dataset.x_train,
+            X=dataset.x_train,
             y=dataset.y_train,
             cv=cv,
             scoring=self.scoring,
@@ -1106,7 +1106,7 @@ class MLWrapper:
             _algorithm = self.algorithm
 
         print_high(f"Final model parameters: {_algorithm.get_params()}")
-        fit_model = _algorithm.fit(x=dataset.x_train, y=dataset.y_train)
+        fit_model = _algorithm.fit(X=dataset.x_train, y=dataset.y_train)
         self.fit_model = fit_model
         print_low("Model fitting complete.")
         return fit_model
