@@ -21,6 +21,7 @@ from sklearn.metrics import root_mean_squared_error  # type: ignore
 from sklearn.metrics._scorer import _BaseScorer
 from sklearn.model_selection import cross_validate
 from sklearn.model_selection import train_test_split
+from sklearn.svm import OneClassSVM
 from sklearn_genetic import GASearchCV
 from sklearn_genetic.callbacks import DeltaThreshold
 from sklearn_genetic.space import Categorical
@@ -825,13 +826,42 @@ class DeployDatasetWrapper:
             print_low(e)
 
 
+def _check_kwargs(kwargs: dict, arg: str, default, type_to_check: type = None, optional: bool = True) -> float:
+    if type_to_check is not None:
+        try:
+            default = type_to_check(default)
+        except ValueError as e:
+            print(f"Provided default value: {default} could not be converted to {type_to_check}")
+            raise e
+    value = default
+    try:
+        if not optional:
+            if arg not in kwargs.keys():
+                raise ValueError(f"Non-optional argument {arg} not provided.")
+        if arg not in kwargs.keys():
+            print_high(f"Optional argument {arg} not provided.")
+        else:
+            if type_to_check is not None:
+                try:
+                    kwargs[arg] = type_to_check(kwargs[arg])
+                except ValueError as e:
+                    print_low(f"Parameter {arg} could not be converted to {str(type_to_check)}.")
+                    raise e
+            value = kwargs[arg]
+            print_high(f"Using alpha={value} for quantile scoring.")
+    except ValueError:
+        print(f"Could not use provided {arg}, using standard value: {default}")
+    return value
+
+
 class MLWrapper:
 
     def __init__(
         self,
-        algorithm_name: str | None = None,
-        algorithm: BaseEstimator | None = None,
-        fit_model: BaseEstimator | None = None,
+        algorithm_name: str = None,
+        algorithm: BaseEstimator = None,
+        fit_model: BaseEstimator = None,
+        applicability_domain_model: OneClassSVM = None,
         scoring: dict = None,
         param_grid: dict = None,
         params: dict = None,
@@ -839,6 +869,7 @@ class MLWrapper:
         self.algorithm_name = algorithm_name
         self.algorithm = algorithm
         self.fit_model = fit_model
+        self.applicability_domain_model = OneClassSVM if applicability_domain_model is None else applicability_domain_model
         self.scoring = {} if scoring is None else scoring
         self.param_grid = {} if param_grid is None else param_grid
         self.params = {} if params is None else params
@@ -862,27 +893,7 @@ class MLWrapper:
         print_high(f"Algorithm set to: {instance.algorithm_name}")
         print_high(f"Random state: {random_state}, n_jobs: {n_jobs}")
 
-        # checking scoring_params for embedded scoring function parameters
-        alpha: float = 0.5
-        try:
-            if ("alpha" not in scoring_params.keys()) and ('quantile' in scoring):
-                raise ValueError("Parameter alpha (quantile) not provided.")
-            if "alpha" in scoring_params.keys():
-                alpha = scoring_params["alpha"]
-                try:
-                    alpha = float(alpha)
-                except ValueError as e:
-                    print_low("Parameter alpha (quantile) could not be converted to float.")
-                    print(e)
-                if not 0 < alpha < 1:
-                    raise ValueError(
-                        "Parameter alpha (quantile) must be a float between 0 and 1,",
-                        )
-                else:
-                    print_high(f"Using alpha={alpha} for quantile scoring.")
-        except ValueError:
-            print("Could not use provided alpha, using standard value: 0.5")
-            alpha: float = 0.5
+        alpha = _check_kwargs(kwargs=scoring_params, arg='alpha', default=0.5, type_to_check=float)
 
         instance._set_scoring(scoring=scoring, alpha=alpha)
         print_high(f"Scoring metrics set to: {list(instance.scoring.keys())}")
@@ -1088,6 +1099,35 @@ class MLWrapper:
         return cv_results
 
 
+    def unpack_cv_results(self, cv_results):
+        """
+        Unpacks cv_results into a long-format DataFrame.
+        """
+        results_list = []
+        for scorer_name in self.scoring.keys():
+            test_key = f'test_{scorer_name}' if f'test_{scorer_name}' in cv_results else 'test_score'
+            train_key = f'train_{scorer_name}' if f'train_{scorer_name}' in cv_results else 'train_score'
+            results_list.append(
+                {
+                    'scorer'      : scorer_name,
+                    'dataset_type': 'test',
+                    'mean'        : np.mean(cv_results[test_key]),
+                    'sd'          : np.std(cv_results[test_key]),
+                    },
+                )
+            if train_key in cv_results:
+                results_list.append(
+                    {
+                        'scorer'      : scorer_name,
+                        'dataset_type': 'train',
+                        'mean'        : np.mean(cv_results[train_key]),
+                        'sd'          : np.std(cv_results[train_key]),
+                        },
+                    )
+
+        return pd.DataFrame(results_list)
+
+
     def fit(
         self,
         dataset: DatasetWrapper,
@@ -1114,14 +1154,53 @@ class MLWrapper:
         return fit_model
 
 
+    def fit_applicability_domain(self, dataset: DatasetWrapper, **kwargs):
+        """
+        Fits a One-Class SVM model to the training data to define the applicability domain.
+        Any additional keyword arguments are passed directly to the OneClassSVM constructor.
+        """
+        print_low("Fitting Applicability Domain model (OneClassSVM).")
+        if dataset.x_train.empty:
+            raise ValueError("Training data in the dataset is empty.")
+
+        gamma = _check_kwargs(kwargs=kwargs, arg='gamma', default='scale')
+
+        self.applicability_domain_model = OneClassSVM(gamma=gamma)
+        self.applicability_domain_model.fit(dataset.x_train)
+        print_low("Applicability Domain model fitting complete.")
+
+
+    def _check_training_data_leakage(
+        self,
+        training_features: pd.DataFrame,
+        deployment_features: pd.DataFrame,
+        ) -> pd.Series:
+        """
+        Checks for exact matches between deployment and training feature sets.
+        Returns a boolean Series indicating if a deployment sample is in the training set.
+        """
+        print_low("Checking for data leakage from training set...")
+        # Convert training dataframe to a set of tuples for efficient comparison
+        train_set = set([tuple(row) for row in training_features.values])
+        deploy_list = [tuple(row) for row in deployment_features.values]
+
+        # Check for membership
+        is_in_training = [item in train_set for item in deploy_list]
+        leakage_count = sum(is_in_training)
+        if leakage_count > 0:
+            print_high(f"Warning: Found {leakage_count} exact matches from the training data in the deployment set.")
+        else:
+            print_high("No data leakage found.")
+        is_in_training = pd.Series(is_in_training, index=deployment_features.index)
+        return is_in_training
+
+
     def deploy(
         self,
         deploy_dataset: DeployDatasetWrapper,
+        training_dataset: DatasetWrapper,
         ):
-        print_low("🚢 Deploying model and making predictions...")
-        # TODO:
-        # dominio aplicabilidade
-
+        print_low("Deploying model and making predictions...")
         if self.fit_model is None:
             print('Model not fit. Please use the .fit() method first.')
             return None
@@ -1130,6 +1209,24 @@ class MLWrapper:
                 'Deployment dataset provided does not contain descriptors. Please use prepare_dataset() or prepare_deploy_dataset() methods.',
                 )
             return None
+
+        deploy_dataset.deploy_data['in_training_set'] = self._check_training_data_leakage(
+            training_features=training_dataset.x_train,
+            deployment_features=deploy_dataset.deploy_descriptors,
+            )
+
+        if self.applicability_domain_model:
+            print_high("Assessing applicability domain...")
+            in_domain = self.applicability_domain_model.predict(deploy_dataset.deploy_descriptors)
+            # Convert to boolean: 1 (inlier) -> True, -1 (outlier) -> False
+            deploy_dataset.deploy_data['in_applicability_domain'] = (in_domain == 1)
+            outliers_count = (in_domain == -1).sum()
+            if outliers_count > 0:
+                print_low(f"Warning: {outliers_count} deployment samples are outside the applicability domain.")
+            else:
+                print_high("All deployment samples are within the applicability domain.")
+        else:
+            print_low("Applicability domain model not fitted. Skipping this check.")
 
         print_high(f"Predicting on {deploy_dataset.deploy_descriptors.shape[0]} samples.")
         prediction = self.fit_model.predict(deploy_dataset.deploy_descriptors)
@@ -1142,11 +1239,6 @@ class MLWrapper:
         print_low("✅ Prediction complete.")
         return None
 
-
-    # TODO
-    # função q gera relatório pdf ***
-    # dalex EXPLAIN
-    # ebook - machine learning e exai - conflito publicação
 
     def _set_algorithm(
         self,
@@ -1249,7 +1341,13 @@ class ModelExplainer:
     """
 
 
-    def __init__(self, fit_model: BaseEstimator, dataset: DatasetWrapper, algorithm_name: str = None, train_subset=True):
+    def __init__(
+        self,
+        fit_model: BaseEstimator,
+        dataset: DatasetWrapper,
+        algorithm_name: str = None,
+        train_subset=True,
+        ):
         """
         Initializes the explainer with a fitted model, DatasetWrapper object and optionally, algorithm_name.
         """
@@ -1396,9 +1494,7 @@ class ModelExplainer:
         pass
 
 # classificação x regressão
-# implementação em dataset externo com AD
-# diagnóstico de resíduos
 # FILTRAGEM POR SIMILARIDADE NA BUSCA DO DATASET
-# exploração de dados - MW, 
-
+# PDF
+# EXPLAIN
 # implementar em R
