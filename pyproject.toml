@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=80.9"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chembl_miner"
+version = "0.1.0"
+authors = [
+    { name = "Henrique Gabriel Wuchryn Martins", email = "henriq.gwm@gmail.com" },
+]
+description = "A package for automating QSAR analysis on ChEMBL data."
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = [
+    "pandas",
+    "numpy",
+    "scipy",
+    "scikit-learn",
+    "matplotlib",
+    "seaborn",
+    "chembl_webresource_client",
+    "padelpy",
+    "rdkit",
+    "sklearn-genetic-opt",
+    "xgboost",
+    "statsmodels"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/henriqwuchryn/chembl_miner"
+"Bug Tracker" = "https://github.com/henriqwuchryn/chembl_miner/issues"
