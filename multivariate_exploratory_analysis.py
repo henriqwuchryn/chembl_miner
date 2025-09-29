@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
+from chembl_miner import data_preprocessing
 import miscelanneous_methods as mm
 
 
@@ -9,7 +10,6 @@ sns.set_theme(style='ticks')
 sns.set_theme(style='whitegrid', font='liberation serif')
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-import machine_learning_methods as mlm
 import matplotlib.pyplot as plt
 import os
 import sys
@@ -59,7 +59,7 @@ for n in range(n_components):
 use_scaler = input('\nDo you want to use a scaler on the features data? 1 or 0\n')
 use_scaler = mm.check_if_int(use_scaler)
 if use_scaler == 1:
-    features_df = mlm.scale_features(features_df, StandardScaler())
+    features_df = data_preprocessing.scale_features(features_df, StandardScaler())
     results_path = f'{results_path}/scaled'
 if not os.path.exists(results_path):
     os.makedirs(results_path)

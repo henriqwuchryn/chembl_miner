@@ -3,10 +3,6 @@ import time
 import numpy as np
 import pandas as pd
 import sklearn.model_selection as model_selection
-from rdkit import Chem
-from rdkit.Chem.rdFingerprintGenerator import GetMorganGenerator
-from rdkit.DataStructs import BulkTanimotoSimilarity, CreateFromBitString
-from rdkit.ML.Cluster import Butina
 from sklearn_genetic import GASearchCV, GAFeatureSelectionCV
 from sklearn_genetic.callbacks import DeltaThreshold
 from sklearn_genetic.space import Categorical
@@ -120,12 +116,6 @@ def get_model_scores(y_pred, y_test):
     return r2, mse, mae
 
 
-def scale_features(features, scaler):
-    features_scaled = scaler.fit_transform(features)
-    features_scaled = pd.DataFrame(features_scaled, index=features.index)
-    return features_scaled
-
-
 def describe_params(params):
     param_string = ""
     for param in params:
@@ -216,55 +206,4 @@ def get_results(cv_results, name=""):
     return score_dfs
 
 
-def _df_to_bitvect_list(df: pd.DataFrame):
-    bit_strings = df.apply(lambda row: ''.join(row.astype(str)), axis=1)
-    return [CreateFromBitString(bs) for bs in bit_strings]
 
-
-def scaffold_split(
-    activity_df: pd.DataFrame,
-    smiles_col: str = 'canonical_smiles',
-    test_size: float = 0.2,
-    similarity_cutoff: float = 0.7,
-    radius: int = 2,
-    fingerprint_n_bits: int = 1024,
-    ) -> tuple[pd.Index, pd.Index]:
-    """
-    Splits a DataFrame into train and test sets based on structural similarity
-    using the Butina clustering algorithm.
-    """
-    print("\n--- Performing structural split ---")
-    molecules: list = []
-    for smiles in activity_df[smiles_col]:
-        molecules.append(Chem.MolFromSmiles(smiles))
-    fingerprint_generator = GetMorganGenerator(radius=radius, fpSize=fingerprint_n_bits)
-    fingerprints: tuple = fingerprint_generator.GetFingerprints(molecules)
-    distances = []
-    n_mols = len(fingerprints)
-    for i in range(n_mols):
-        similarity_values = BulkTanimotoSimilarity(fingerprints[i], fingerprints[:i])
-        distances.extend([1 - value for value in similarity_values])
-    clusters: tuple[tuple] = Butina.ClusterData(distances, n_mols, 1.0 - similarity_cutoff, isDistData=True)
-    clusters: list[tuple] = sorted(clusters, key=len, reverse=True)
-    test_indices: list = []
-    train_indices: list = []
-    train_target = n_mols * (1 - test_size)
-    test_target = n_mols * test_size
-
-    for cluster in clusters:
-        # Assign cluster to the set that is further from its target size
-        train_need = len(train_indices) / train_target
-        test_need = len(test_indices) / test_target
-
-        if train_need >= test_need:
-            test_indices.extend(cluster)
-        else:
-            train_indices.extend(cluster)
-
-    train_df_indices = activity_df.index[train_indices]
-    test_df_indices = activity_df.index[test_indices]
-    print(f"Clustered {n_mols} molecules into {len(clusters)} clusters.")
-    print(f"Train set size: {len(train_df_indices)}, Test set size: {len(test_df_indices)}.")
-    print(f"Effective holdout ratio: {round(len(test_df_indices) / (len(test_df_indices) + len(train_df_indices)), 4)}")
-
-    return train_df_indices, test_df_indices
