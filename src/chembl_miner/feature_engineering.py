@@ -6,8 +6,8 @@ from padelpy import padeldescriptor
 from rdkit import Chem
 from rdkit.Chem import Descriptors, Lipinski
 
-import data_preprocessing
-from utils import print_low, print_high
+from .utils import print_low, print_high
+from .data_preprocessing import remove_low_variance_columns
 
 
 def _calculate_fingerprint(
@@ -85,7 +85,7 @@ def calculate_fingerprint(
         print_low("Removing low variance features.")
         print_high(f"Variance threshold: {low_variance_threshold}")
         initial_cols = descriptors_df.shape[1]
-        descriptors_df = data_preprocessing.remove_low_variance_columns(
+        descriptors_df = remove_low_variance_columns(
             input_data=descriptors_df,
             threshold=low_variance_threshold,
             )

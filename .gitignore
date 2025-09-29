@@ -1,9 +1,5 @@
-analysis/
-datasets/
-notebooks/
 __pycache__/
-fingerprint_used
 descriptors*
 molecules.smi
 *.csv
-example.py
+.idea

@@ -10,8 +10,8 @@ from sklearn_genetic import DeltaThreshold, GASearchCV
 from sklearn_genetic.space import Integer, Continuous, Categorical
 from xgboost import XGBRegressor
 
-from datasets import DatasetWrapper, DeployDatasetWrapper
-from utils import print_low, print_high, _check_kwargs
+from .datasets import DatasetWrapper, DeployDatasetWrapper
+from .utils import print_low, print_high, _check_kwargs
 
 
 class MLWrapper:

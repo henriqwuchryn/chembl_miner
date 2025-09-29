@@ -1,8 +1,8 @@
 import pandas as pd
 from chembl_webresource_client.new_client import new_client
 
-from utils import print_low, print_high
-from config import settings
+from .utils import print_low, print_high
+from .config import settings
 
 
 def get_activity_data(

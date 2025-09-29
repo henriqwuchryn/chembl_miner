@@ -7,7 +7,7 @@ from scipy.stats import mannwhitneyu
 from sklearn.base import BaseEstimator
 from statsmodels import api as sm
 
-from datasets import DatasetWrapper
+from .datasets import DatasetWrapper
 
 
 class DataExplainer:

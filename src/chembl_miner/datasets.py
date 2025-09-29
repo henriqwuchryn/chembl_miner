@@ -7,8 +7,7 @@ from rdkit.DataStructs import BulkTanimotoSimilarity
 from rdkit.ML.Cluster import Butina
 from sklearn.model_selection import train_test_split
 
-from utils import print_low, print_high
-from feature_engineering import calculate_fingerprint
+from .utils import print_low, print_high
 
 
 class DatasetWrapper:
@@ -211,14 +210,16 @@ class DeployDatasetWrapper:
     def prepare_dataset(
         cls,
         deploy_data: pd.DataFrame,
+        deploy_descriptors: pd.DataFrame,
         model_features,
-        smiles_col: str = 'canonical_smiles',
-        fingerprint: str = 'pubchem',
         ):
         print_low("Preparing DeployDatasetWrapper object.")
         instance = cls()
-        instance.deploy_data = deploy_data
-        instance.prepare_deploy_dataset(model_features=model_features, smiles_col=smiles_col, fingerprint=fingerprint)
+        instance.prepare_deploy_dataset(
+            deploy_data=deploy_data,
+            deploy_descriptors=deploy_descriptors,
+            model_features=model_features
+        )
         print_low("DeployDatasetWrapper object prepared.")
         return instance
 
@@ -250,24 +251,13 @@ class DeployDatasetWrapper:
 
     def prepare_deploy_dataset(
         self,
+        deploy_data,
+        deploy_descriptors,
         model_features,
-        smiles_col: str,
-        fingerprint: str,
         ):
-
-        if smiles_col not in self.deploy_data.columns:
-            raise ValueError("Could not find smiles column in provided data")
-        if self.deploy_descriptors.empty:
-            print_low("No descriptors found on DeploymentDatasetWrapper object, calculating now.")
-            self.deploy_descriptors = calculate_fingerprint(
-                activity_df=self.deploy_data,
-                smiles_col=smiles_col,
-                fingerprint=fingerprint,
-                )
-        else:
-            print_low('Descriptors already calculated, skipping calculation')
-            print_low("Aligning deployment features with model features...")
-            print_high(f"Deployment descriptors shape before alignment: {self.deploy_descriptors.shape}")
+        self.deploy_data = deploy_data
+        self.deploy_descriptors = deploy_descriptors
+        print_high(f"Deployment descriptors shape before alignment: {self.deploy_descriptors.shape}")
         try:
             self.deploy_descriptors = self.deploy_descriptors.loc[:, model_features]
             print_high(f"Deployment descriptors shape after alignment: {self.deploy_descriptors.shape}")
@@ -277,7 +267,7 @@ class DeployDatasetWrapper:
                 "Please, rerun prepare_deploy_dataset method from DeployDatasetWrapper instance with new model_features iterable.",
                 )
             print_low(
-                "Tip: use feature_names_in_ attribute from the model, or x_train.columns attribute from the dataset wrapper.\n", )
+                "Tip: use feature_names_in_ attribute from the model, or x_train.columns attribute from the training dataset wrapper.\n", )
             print_low(e)
 
 

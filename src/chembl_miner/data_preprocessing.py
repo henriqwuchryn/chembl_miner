@@ -2,9 +2,9 @@ import numpy as np
 import pandas as pd
 from sklearn.feature_selection import VarianceThreshold
 
-import feature_engineering
-from data_retrieval import filter_by_assay
-from utils import print_low, print_high
+from .feature_engineering import get_lipinski_descriptors
+from .data_retrieval import filter_by_assay
+from .utils import print_low, print_high
 
 
 def preprocess_data(
@@ -35,7 +35,7 @@ def preprocess_data(
         activity_df = filter_by_assay(activity_df=activity_df, assay_ids=assay_ids)
         print_high(f"Dataframe filtered size: {activity_df.shape[0]}")
     print_high("Calculating Lipinski descriptors.")
-    activity_df = feature_engineering.get_lipinski_descriptors(molecules_df=activity_df)
+    activity_df = get_lipinski_descriptors(molecules_df=activity_df)
     print_high("Calculating Rule of 5 violations.")
     activity_df = get_ro5_violations(molecules_df=activity_df)
     if convert_units:
