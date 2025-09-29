@@ -379,7 +379,7 @@ class DatasetWrapper:
             print_low(f"DatasetWrapper object loaded from {file_path}")
             print_high(f"Dataset size: {instance.general_data.shape[0]}")
             print_high(f"Train subset size: {len(instance.y_train)}")
-            print_high(f"Test shape: {len(instance.y_test)}")
+            print_high(f"Test subset size: {len(instance.y_test)}")
             print_high(f"Number of features: {instance.x_test.shape[1]}")
         except Exception as e:
             print("Dataset loading failed")
@@ -421,7 +421,7 @@ class DatasetWrapper:
         print_low(f"DatasetWrapper object loaded from unsplit DataFrames and split into train/test sets.")
         print_high(f"Dataset size: {instance.general_data.shape[0]}")
         print_high(f"Train subset size: {len(instance.y_train)}")
-        print_high(f"Test shape: {len(instance.y_test)}")
+        print_high(f"Test subset size: {len(instance.y_test)}")
         print_high(f"Number of features: {instance.x_test.shape[1]}")
         return instance
 
@@ -471,7 +471,7 @@ class DatasetWrapper:
 
         print(f"Dataset size: {self.general_data.shape[0]}")
         print(f"Train subset size: {len(self.y_train)}")
-        print(f"Test shape: {len(self.y_test)}")
+        print(f"Test subset size: {len(self.y_test)}")
         print(f"Number of features: {self.x_test.shape[1]}")
 
 
