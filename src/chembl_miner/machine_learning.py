@@ -10,11 +10,11 @@ from sklearn_genetic import DeltaThreshold, GASearchCV
 from sklearn_genetic.space import Integer, Continuous, Categorical
 from xgboost import XGBRegressor
 
-from .datasets import DatasetWrapper, DeployDatasetWrapper
+from .datasets import TrainingData, PredictionData
 from .utils import print_low, print_high, _check_kwargs
 
 
-class MLWrapper:
+class ModelPipeline:
 
     def __init__(
         self,
@@ -44,7 +44,7 @@ class MLWrapper:
         **scoring_params,
         ):
         print_low("Setting up MLWrapper object.")
-        instance = MLWrapper()
+        instance = ModelPipeline()
         instance._set_algorithm(
             algorithm=algorithm,
             random_state=random_state,
@@ -65,7 +65,7 @@ class MLWrapper:
     # TODO: implementar outros métodos de busca (grid, random)
     def optimize_hyperparameters(
         self,
-        dataset: DatasetWrapper,
+        dataset: TrainingData,
         cv: int = 3,
         param_grid: dict | None = None,
         refit: str | bool = True,
@@ -225,7 +225,7 @@ class MLWrapper:
 
     def evaluate_model(
         self,
-        dataset: DatasetWrapper,
+        dataset: TrainingData,
         cv: int = 10,
         params: dict | None = None,
         n_jobs=-1,
@@ -290,7 +290,7 @@ class MLWrapper:
 
     def fit(
         self,
-        dataset: DatasetWrapper,
+        dataset: TrainingData,
         params: dict | None = None,
         ):
         print_low("Fitting model on the training dataset.")
@@ -314,7 +314,7 @@ class MLWrapper:
         return fit_model
 
 
-    def fit_applicability_domain(self, dataset: DatasetWrapper, **kwargs):
+    def fit_applicability_domain(self, dataset: TrainingData, **kwargs):
         """
         Fits a One-Class SVM model to the training data to define the applicability domain.
         Any additional keyword arguments are passed directly to the OneClassSVM constructor.
@@ -357,8 +357,8 @@ class MLWrapper:
 
     def deploy(
         self,
-        deploy_dataset: DeployDatasetWrapper,
-        training_dataset: DatasetWrapper,
+        deploy_dataset: PredictionData,
+        training_dataset: TrainingData,
         ):
         print_low("Deploying model and making predictions...")
         if self.fit_model is None:

@@ -2,4 +2,6 @@ __pycache__/
 descriptors*
 molecules.smi
 *.csv
-.idea
+.idea/*
+dist
+src/chembl_miner.egg-info

@@ -7,10 +7,10 @@ from scipy.stats import mannwhitneyu
 from sklearn.base import BaseEstimator
 from statsmodels import api as sm
 
-from .datasets import DatasetWrapper
+from .datasets import TrainingData
 
 
-class DataExplainer:
+class DataExplorer:
     """
     A class for performing exploratory data analysis on a dataset.
 
@@ -18,7 +18,7 @@ class DataExplainer:
     """
 
 
-    def __init__(self, dataset: DatasetWrapper):
+    def __init__(self, dataset: TrainingData):
         """
         Constructor method to create an explainer from a DatasetWrapper object.
 
@@ -216,7 +216,7 @@ class DataExplainer:
         return fig
 
 
-class ModelExplainer:
+class ModelAnalyzer:
     """
     A class for explaining and diagnosing a fitted machine learning model.
     """
@@ -225,7 +225,7 @@ class ModelExplainer:
     def __init__(
         self,
         fit_model: BaseEstimator,
-        dataset: DatasetWrapper,
+        dataset: TrainingData,
         algorithm_name: str = None,
         train_subset=True,
         ):

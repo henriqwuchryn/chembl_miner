@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from .utils import print_low, print_high
 
 
-class DatasetWrapper:
+class TrainingData:
 
     def __init__(
         self,
@@ -193,7 +193,7 @@ class DatasetWrapper:
                 )
 
 
-class DeployDatasetWrapper:
+class PredictionData:
 
     def __init__(
         self,
