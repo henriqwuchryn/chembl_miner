@@ -48,20 +48,22 @@ def calculate_fingerprint(
     print_high(
         "This will create temporary files in this folder: descriptors.csv; descriptors.csv.log and molecules.smi",
         )
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    fingerprinters_dir = os.path.join(script_dir, 'fingerprinters')
     fingerprint_dict = {
-        "atompairs2d"      : "fingerprinters/AtomPairs2DFingerprinter.xml",
-        "atompairs2dcount" : "fingerprinters/AtomPairs2DFingerprintCount.xml",
-        "estate"           : "fingerprinters/EStateFingerprinter.xml",
-        "extended"         : "fingerprinters/ExtendedFingerprinter.xml",
-        "fingerprinters"    : "fingerprinters/Fingerprinter.xml",
-        "graphonly"        : "fingerprinters/GraphOnlyFingerprinter.xml",
-        "klekota"          : "fingerprinters/KlekotaRothFingerprinter.xml",
-        "klekotacount"     : "fingerprinters/KlekotaRothFingerprintCount.xml",
-        "maccs"            : "fingerprinters/MACCSFingerprinter.xml",
-        "pubchem"          : "fingerprinters/PubchemFingerprinter.xml",
-        "substructure"     : "fingerprinters/SubstructureFingerprinter.xml",
-        "substructurecount": "fingerprinters/SubstructureFingerprintCount.xml",
-        }
+        "atompairs2d"      : os.path.join(fingerprinters_dir, "AtomPairs2DFingerprinter.xml"),
+        "atompairs2dcount" : os.path.join(fingerprinters_dir, "AtomPairs2DFingerprintCount.xml"),
+        "estate"           : os.path.join(fingerprinters_dir, "EStateFingerprinter.xml"),
+        "extended"         : os.path.join(fingerprinters_dir, "ExtendedFingerprinter.xml"),
+        "fingerprinters"    : os.path.join(fingerprinters_dir, "Fingerprinter.xml"),
+        "graphonly"        : os.path.join(fingerprinters_dir, "GraphOnlyFingerprinter.xml"),
+        "klekota"          : os.path.join(fingerprinters_dir, "KlekotaRothFingerprinter.xml"),
+        "klekotacount"     : os.path.join(fingerprinters_dir, "KlekotaRothFingerprintCount.xml"),
+        "maccs"            : os.path.join(fingerprinters_dir, "MACCSFingerprinter.xml"),
+        "pubchem"          : os.path.join(fingerprinters_dir, "PubchemFingerprinter.xml"),
+        "substructure"     : os.path.join(fingerprinters_dir, "SubstructureFingerprinter.xml"),
+        "substructurecount": os.path.join(fingerprinters_dir, "SubstructureFingerprintCount.xml"),
+    }
 
     if type(fingerprint) == str:
         fingerprint = [fingerprint]
