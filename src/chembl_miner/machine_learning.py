@@ -209,7 +209,7 @@ class ModelPipeline:
                 },
                 "xgboost_reg": {
                     "objective": Categorical(
-                        choices=["reg:squarederror", "reg:squaredlogerror", "reg:logistic", "reg:pseudohubererror",
+                        choices=["reg:squarederror", "reg:squaredlogerror","reg:pseudohubererror",
                                  "reg:absoluteerror"]),
                     "n_estimators": Integer(lower=100, upper=2000),
                     "learning_rate": Continuous(lower=0.001, upper=1),
