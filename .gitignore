@@ -3,5 +3,6 @@ descriptors*
 molecules.smi
 *.csv
 .idea/*
+build/
 dist
 src/chembl_miner.egg-info

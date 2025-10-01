@@ -7,7 +7,6 @@ from rdkit import Chem
 from rdkit.Chem import Descriptors, Lipinski
 
 from .utils import print_low, print_high
-from .data_preprocessing import remove_low_variance_columns
 
 
 def _calculate_fingerprint(
@@ -43,8 +42,6 @@ def calculate_fingerprint(
     activity_df: pd.DataFrame,
     smiles_col="canonical_smiles",
     fingerprint: str | list[str] = "pubchem",
-    remove_low_variance: bool = False,
-    low_variance_threshold: float = 0.0,
     ) -> pd.DataFrame:
     # TODO: generalizar para demais descritores
     print_low("Starting fingerprinters calculation.")
@@ -81,16 +78,6 @@ def calculate_fingerprint(
             )
         descriptors_df = pd.concat(objs=[descriptors_df, descriptors_df_i], axis=1)
     print_high(f"Total features from fingerprints: {descriptors_df.shape[1]}")
-    if remove_low_variance:
-        print_low("Removing low variance features.")
-        print_high(f"Variance threshold: {low_variance_threshold}")
-        initial_cols = descriptors_df.shape[1]
-        descriptors_df = remove_low_variance_columns(
-            input_data=descriptors_df,
-            threshold=low_variance_threshold,
-            )
-        final_cols = descriptors_df.shape[1]
-        print_high(f"Removed {initial_cols - final_cols} low variance columns. Kept {final_cols}.")
     print_low("Fingerprint calculation complete.")
 
     return descriptors_df
