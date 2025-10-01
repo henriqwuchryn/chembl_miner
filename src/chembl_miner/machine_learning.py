@@ -233,6 +233,32 @@ class ModelPipeline:
                     "reg_alpha": Continuous(lower=0.1, upper=2.0),  # L1 regularization
                     "reg_lambda": Continuous(lower=0.1, upper=2.0),  # L2 regularization
                 },
+                "xgboost_reg_quantile": {
+                    "objective": Categorical(
+                        choices=["reg:quantileerror"]),
+                    "quantile_alpha": Continuous(lower=0.01, upper=0.99),
+                    "n_estimators": Integer(lower=100, upper=2000),
+                    "learning_rate": Continuous(lower=0.001, upper=1),
+                    "max_depth": Integer(lower=0, upper=100),
+                    "min_child_weight": Continuous(
+                        lower=0.1,
+                        upper=2.0,
+                    ),  # Minimum sum of instance weight needed in a child
+                    "gamma": Continuous(
+                        lower=0.1,
+                        upper=2.0,
+                    ),  # Minimum loss reduction required to make a split
+                    "subsample": Continuous(
+                        lower=0.1,
+                        upper=1,
+                    ),  # Fraction of samples used for fitting
+                    "colsample_bytree": Continuous(
+                        lower=0.1,
+                        upper=1,
+                    ),  # Fraction of features used for fitting
+                    "reg_alpha": Continuous(lower=0.1, upper=2.0),  # L1 regularization
+                    "reg_lambda": Continuous(lower=0.1, upper=2.0),  # L2 regularization
+                },
             }
             if self.algorithm_name not in available_param_grids.keys():
                 raise ValueError(
@@ -456,7 +482,8 @@ class ModelPipeline:
                 ),
                 "randomforest_reg": RandomForestRegressor(random_state=random_state, n_jobs=n_jobs),
                 "xgboost_reg": XGBRegressor(random_state=random_state, n_jobs=n_jobs),
-            }
+                "xgboost_reg_quantile": XGBRegressor(random_state=random_state, n_jobs=n_jobs),
+                }
             if algorithm not in available_algorithms.keys():
                 raise ValueError(f'Algorithm {algorithm} not recognized')
             self.algorithm = available_algorithms[algorithm]

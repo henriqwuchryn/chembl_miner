@@ -1,7 +1,5 @@
 # ChEMBL Miner
 
-**Version 0.1.2**
-
 `chembl_miner` is a Python package designed to streamline the process of Quantitative Structure-Activity Relationship (QSAR)
 analysis using data from the [ChEMBL database](https://www.ebi.ac.uk/chembl/). It provides a comprehensive suite of tools for data retrieval, preprocessing,
 feature engineering, machine learning, and model interpretation, enabling a complete and automated workflow.
