@@ -160,7 +160,7 @@ This project is licensed under the MIT License - see the [LICENSE](https://www.g
 
 ## Issues and Contact 📬
 
-Please report any issues or questions on the [GitHub issues page](https://github.com/henriqwuchryn/chembl_miner/issues).
+Please report any issues or questions on the [GitHub issues page](https://github.com/henriqwuchryn/chembl_miner/issues) or through e-mail: henrique.wuchryn@ufpr.br.
 
 ```
 ```
