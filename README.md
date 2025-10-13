@@ -113,7 +113,7 @@ print('Best parameters found:', ml.params)
 
 ### 3\. Model Training and Analysis
 
-With the best hyperparameters, train the final model and analyze its performance. For a detailed guide on interpreting the diagnostic plots, please refer to [this resource] by Przemyslaw Biecek and Tomasz Burzykowski (2020)(https://ema.drwhy.ai/residualDiagnostic.html).
+With the best hyperparameters, train the final model and analyze its performance. For a detailed guide on interpreting the diagnostic plots, please refer to [this resource](https://ema.drwhy.ai/residualDiagnostic.html) by Przemyslaw Biecek and Tomasz Burzykowski (2020).
 
 ```python
 from chembl_miner import ModelAnalyzer
