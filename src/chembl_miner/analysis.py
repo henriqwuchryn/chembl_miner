@@ -48,7 +48,7 @@ class DataExplorer:
         ax.set_xlabel(self.target.name, fontsize=12)
         ax.set_ylabel('Frequency', fontsize=12)
         ax.legend()
-        plt.tight_layout()
+        fig.tight_layout()
         return fig
 
 
@@ -68,8 +68,8 @@ class DataExplorer:
             axes[i].set_title(f'Distribution of {col}', fontsize=14)
             axes[i].set_ylabel('Value', fontsize=12)
 
-        plt.suptitle('Distribution of Lipinski Descriptors', fontsize=16, y=1.02)
-        plt.tight_layout()
+        fig.suptitle('Distribution of Lipinski Descriptors', fontsize=16, y=1.02)
+        fig.tight_layout()
         return fig
 
 
@@ -99,7 +99,7 @@ class DataExplorer:
         ax.set_title('Relative Frequency of Ro5 Violations by Bioactivity Class', fontsize=16)
         ax.set_xlabel('Bioactivity Class', fontsize=12)
         ax.set_ylabel('Number of Ro5 Violations', fontsize=12)
-        plt.tight_layout()
+        fig.tight_layout()
         return fig
 
 
@@ -126,8 +126,8 @@ class DataExplorer:
             axes[i].set_xlabel('Value', fontsize=12)
             axes[i].set_ylabel('Density', fontsize=12)
 
-        plt.suptitle('Density of Lipinski Descriptors', fontsize=16, y=1.02)
-        plt.tight_layout()
+        fig.suptitle('Density of Lipinski Descriptors', fontsize=16, y=1.02)
+        fig.tight_layout()
         return fig
 
 
@@ -162,7 +162,7 @@ class DataExplorer:
         ax.set_xlabel('Molecular Weight (MW)', fontsize=12)
         ax.set_ylabel('LogP', fontsize=12)
         ax.legend(title='Bioactivity Class')
-        plt.tight_layout()
+        fig.tight_layout()
         return fig
 
 
@@ -192,7 +192,7 @@ class DataExplorer:
 
         ax.set_xlabel(feature_name, fontsize=12)
         ax.set_ylabel(self.target.name, fontsize=12)
-        plt.tight_layout()
+        fig.tight_layout()
         return fig
 
 
@@ -212,7 +212,7 @@ class DataExplorer:
         sns.heatmap(top_corr_matrix, annot=True, fmt=".2f", cmap='coolwarm', mask=mask, ax=ax)
 
         ax.set_title(f'Top {top_n} Features Correlated with {self.target.name}', fontsize=16)
-        plt.tight_layout()
+        fig.tight_layout()
         return fig
 
 
@@ -273,7 +273,7 @@ class ModelAnalyzer:
         ax.set_xlabel('Fitted Values (y_pred)', fontsize=12)
         ax.set_ylabel('Residuals', fontsize=12)
         ax.legend()
-        plt.tight_layout()
+        fig.tight_layout()
         return fig
 
 
@@ -288,7 +288,7 @@ class ModelAnalyzer:
         ax.lines[1].set_color('red')
         ax.lines[1].set_linewidth(2)
         ax.set_title('Normal Q-Q Plot', fontsize=14)
-        plt.tight_layout()
+        fig.tight_layout()
         return fig
 
 
@@ -310,7 +310,7 @@ class ModelAnalyzer:
         ax.set_xlabel('Fitted Values', fontsize=12)
         ax.set_ylabel('$\\sqrt{|Standardized \, Residuals|}$', fontsize=12)
         ax.legend()
-        plt.tight_layout()
+        fig.tight_layout()
         return fig
 
 
@@ -337,7 +337,7 @@ class ModelAnalyzer:
         ax.set_xlabel('Actual Values (y_true)', fontsize=12)
         ax.set_ylabel('Predicted Values (y_pred)', fontsize=12)
         ax.legend()
-        plt.tight_layout()
+        fig.tight_layout()
         return fig
 
 
@@ -360,7 +360,7 @@ class ModelAnalyzer:
         ax.set_xlabel('Sample ID / Index', fontsize=12)
         ax.set_ylabel('Absolute Residual', fontsize=12)
         ax.tick_params(axis='x', rotation=90)
-        plt.tight_layout()
+        fig.tight_layout()
         return fig
 
 
