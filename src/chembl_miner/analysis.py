@@ -175,10 +175,13 @@ class DataExplorer:
         - Scatter plot for numeric features.
         - Box plot for categorical features.
         """
-        if feature_name not in self.features.columns:
+        if feature_name in self.features.columns:
+            feature = self.features[feature_name]
+        elif feature_name in self.general_data.columns:
+            feature = self.general_data[feature_name]
+        else:
             raise ValueError(f"Feature '{feature_name}' not found in the data.")
 
-        feature = self.features[feature_name]
         fig, ax = plt.subplots(figsize=(10, 6))
 
         # Check if feature is numeric or categorical to decide the plot type
