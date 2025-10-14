@@ -45,7 +45,7 @@ def _check_kwargs(kwargs: dict, arg: str, default, type_to_check: type = None, o
                     print_low(f"Parameter {arg} could not be converted to {str(type_to_check)}.")
                     raise e
             value = kwargs[arg]
-            print_high(f"Using alpha={value} for quantile scoring.")
+            print_high(f"Using {arg}={value}")
     except ValueError:
         print(f"Could not use provided {arg}, using standard value: {default}")
     return value

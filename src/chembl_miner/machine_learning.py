@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import joblib
+from deap.tools import crossover, mutation
 from sklearn.base import BaseEstimator
 from sklearn.ensemble import BaggingRegressor, ExtraTreesRegressor, GradientBoostingRegressor, \
     HistGradientBoostingRegressor, RandomForestRegressor
@@ -115,6 +116,7 @@ class ModelPipeline:
             population_size: int = 30,
             generations: int = 30,
             n_jobs=-1,
+            **kwargs
     ):
         print_low("Starting hyperparameter optimization with GASearchCV (genetic algorithm parameter search).")
         self._check_attributes()
@@ -269,6 +271,11 @@ class ModelPipeline:
         else:
             print_high("Using user-provided parameter grid.")
         try:
+            crossover_probability = _check_kwargs(kwargs,'crossover_probability',0.2)
+            mutation_probability = _check_kwargs(kwargs,'mutation_probability',0.8)
+            tournament_size = _check_kwargs(kwargs,'tournament_size',3)
+            elitism = _check_kwargs(kwargs,'elitism',True)
+            keep_top_k = _check_kwargs(kwargs,'keep_top_k',1)
             callback = DeltaThreshold(threshold=0.001, generations=3)
             param_search = GASearchCV(
                 estimator=self.algorithm,
@@ -277,6 +284,11 @@ class ModelPipeline:
                 scoring=self.scoring,
                 population_size=population_size,
                 generations=generations,
+                crossover_probability=crossover_probability,
+                mutation_probability=mutation_probability,
+                tournament_size=tournament_size,
+                elitism = elitism,
+                keep_top_k=keep_top_k,
                 refit=refit,  # type: ignore
                 n_jobs=n_jobs,
                 return_train_score=True,
