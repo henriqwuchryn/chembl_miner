@@ -103,7 +103,7 @@ class DataExplorer:
         return fig
 
 
-    def plot_lipinski_density(self, lipinski_descriptors: list[str] = None) -> plt.Figure:
+    def plot_lipinski_density(self, lipinski_descriptors: list[str] = None, group_by_bioactivity=True) -> plt.Figure:
         """
         Generates overlapping density plots for specified Lipinski descriptors.
 
@@ -117,11 +117,30 @@ class DataExplorer:
         if not all(col in self.general_data.columns for col in lipinski_descriptors):
             raise ValueError(f"One or more specified descriptors not found in the data.")
 
+        hue_column=None
+        if group_by_bioactivity:
+            if 'bioactivity_class' not in self.general_data.columns:
+                raise ValueError(
+                    "Argument 'group_by_bioactivity' is True, but the "
+                    "'bioactivity_class' column was not found."
+                    )
+            else:
+                hue_column = 'bioactivity_class'
+
         fig, axes = plt.subplots(2, 2, figsize=(12, 10))
         axes = axes.flatten()
 
         for i, desc in enumerate(lipinski_descriptors):
-            sns.kdeplot(self.general_data[desc], ax=axes[i], fill=True, alpha=0.5)
+            sns.kdeplot(
+                data=self.general_data,
+                x=desc,
+                ax=axes[i],
+                hue=hue_column,
+                fill=True,
+                alpha=0.3,
+                common_norm=False,
+                hue_order=['active', 'intermediate', 'inactive'],
+                palette={'active': 'forestgreen', 'intermediate': 'goldenrod', 'inactive': 'firebrick'},)
             axes[i].set_title(f'Density of {desc}', fontsize=14)
             axes[i].set_xlabel('Value', fontsize=12)
             axes[i].set_ylabel('Density', fontsize=12)
