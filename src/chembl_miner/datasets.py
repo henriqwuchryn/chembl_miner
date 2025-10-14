@@ -54,6 +54,7 @@ class TrainingData:
         descriptors_df: pd.DataFrame,
         target_column: str = "neg_log_value",
         use_structural_split: bool = True,
+        similarity_cutoff: float = 0.7,
         holdout_size: float = 0.2,
         random_state: int = 42,
         ):
@@ -72,6 +73,7 @@ class TrainingData:
                 target_column=target_column,
                 nonfeature_columns=nonfeature_columns,
                 use_structural_split=use_structural_split,
+                similarity_cutoff=similarity_cutoff,
                 holdout_size=holdout_size,
                 random_state=random_state,
                 )
@@ -156,6 +158,7 @@ class TrainingData:
         target_column: str,
         nonfeature_columns,
         use_structural_split: bool,
+        similarity_cutoff: float,
         holdout_size: float,
         random_state: int,
         ) -> None:
@@ -179,6 +182,7 @@ class TrainingData:
             train_index, test_index = scaffold_split(
                 activity_df=self.general_data,
                 test_size=holdout_size,
+                similarity_cutoff=similarity_cutoff,
                 )
             self.x_train = features.loc[train_index]
             self.x_test = features.loc[test_index]
