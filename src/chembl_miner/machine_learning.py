@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import joblib
+import dill
 from deap.tools import crossover, mutation
 from sklearn.base import BaseEstimator
 from sklearn.ensemble import BaggingRegressor, ExtraTreesRegressor, GradientBoostingRegressor, \
@@ -64,7 +64,7 @@ class ModelPipeline:
 
         return instance
 
-    def save_model_pipeline(self, file_path: str) -> None:
+    def to_path(self, file_path: str) -> None:
         """
         Saves the ModelPipeline object to a file using joblib.
 
@@ -74,14 +74,15 @@ class ModelPipeline:
         """
         try:
             print_low(f"Saving ModelPipeline object to {file_path}.")
-            joblib.dump(self, file_path)
+            with open(file_path, 'wb') as file:
+                file.write(dill.dumps(self))
             print_low("Pipeline saved successfully.")
         except Exception as e:
             print(f"Error saving pipeline: {e}")
             raise e
 
     @staticmethod
-    def load_model_pipeline(file_path: str):
+    def from_path(file_path: str):
         """
         Loads a ModelPipeline object from a file using joblib.
 
@@ -93,7 +94,8 @@ class ModelPipeline:
         """
         try:
             print_low(f"Loading ModelPipeline object from {file_path}...")
-            pipeline = joblib.load(file_path)
+            with open(file_path, 'rb') as file:
+                pipeline = dill.loads(file.read())
             if not isinstance(pipeline, ModelPipeline):
                 print_low("Warning: Loaded object is not an instance of ModelPipeline.")
             else:
