@@ -6,3 +6,5 @@ from .feature_engineering import calculate_fingerprint
 from .machine_learning import ModelPipeline
 from .utils import set_verbosity
 
+#TODO: implement id for each and every object
+

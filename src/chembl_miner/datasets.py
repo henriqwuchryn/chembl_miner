@@ -203,11 +203,11 @@ class PredictionData:
         self,
         deploy_data: pd.DataFrame = None,
         deploy_descriptors: pd.DataFrame = None,
-        prediction: pd.DataFrame = None,
+        prediction: dict = None,
         ) -> None:
         self.deploy_data = pd.DataFrame() if deploy_data is None else deploy_data
         self.deploy_descriptors = pd.DataFrame() if deploy_descriptors is None else deploy_descriptors
-        self.prediction = pd.DataFrame() if prediction is None else prediction
+        self.prediction = {} if prediction is None else prediction
 
 
     @classmethod
@@ -227,16 +227,20 @@ class PredictionData:
         print_low("DeployDatasetWrapper object prepared.")
         return instance
 
-
+    #TODO:  IMPLEMENT BOTH DILL AND HUMAN READABLE SAVE MODES (CSV AND TXT FILES READABLE WITH A TEXT EDITOR)
     @classmethod
     def from_path(cls, file_path):
         if not os.path.exists(file_path):
             print("Provided file_path does not exist")
         print_low(f"Loading DeployDatasetWrapper object from {file_path}.")
         instance = cls()
-        instance.deploy_data = pd.read_csv(f"{file_path}/deploy_data.csv")
-        instance.deploy_descriptors = pd.read_csv(f"{file_path}/deploy_descriptors.csv")
-        instance.prediction = pd.read_csv(f"{file_path}/prediction.csv")
+        instance.deploy_data = pd.read_csv(f"{file_path}/deploy_data.csv", index_col='index')
+        instance.deploy_descriptors = pd.read_csv(f"{file_path}/deploy_descriptors.csv",index_col='index')
+        predictions_path = f"{file_path}/prediction/"
+        predictions_files = os.listdir(predictions_path)
+        for file in predictions_files:
+            key = file[:-4]
+            instance.prediction[key] = pd.read_csv(f"{predictions_path}/{file}", index_col='index')
         print_low("DeploymentDatasetWrapper object with data, descriptors, and previous predictions loaded.")
         return instance
 
@@ -249,7 +253,12 @@ class PredictionData:
 
         self.deploy_data.to_csv(f"{file_path}/deploy_data.csv", index_label="index")
         self.deploy_descriptors.to_csv(f"{file_path}/deploy_descriptors.csv", index_label="index")
-        self.prediction.to_csv(f"{file_path}/prediction.csv", index_label="index")
+        predictions_path = f"{file_path}/prediction/"
+        if not os.path.exists(predictions_path):
+            print_high(f"Creating directory: {predictions_path}")
+            os.makedirs(predictions_path)
+        for key in self.prediction.keys():
+            self.prediction[key].to_csv(f"{predictions_path}/{key}.csv")
         print_low("DeploymentDatasetWrapper object with data, descriptors, and predictions saved.")
 
 
