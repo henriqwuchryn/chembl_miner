@@ -452,7 +452,10 @@ class ModelPipeline:
         self,
         deploy_dataset: PredictionData,
         training_dataset: TrainingData,
+        tag: str = ''
         ):
+        if tag != '':
+            tag = f'_{tag}'
         print_low("Deploying model and making predictions...")
         if self.fit_model is None:
             print('Model not fit. Please use the .fit() method first.')
@@ -464,7 +467,7 @@ class ModelPipeline:
             return None
         count = 1
         while True:
-            prediction_id = f'{self.algorithm_name}_{count}'
+            prediction_id = f'{self.algorithm_name}{tag}_{count}'
             if prediction_id in deploy_dataset.prediction.keys():
                 count += 1
             else:
