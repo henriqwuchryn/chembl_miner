@@ -513,8 +513,7 @@ class ModelPipeline:
         if len(prediction) != deploy_dataset.deploy_data.shape[0]:
             print_low("Prediction shape does not match deploy_data.shape. Check descriptors for missing values.")
         else:
-            deploy_dataset.deploy_data.loc[:, f'{self.algorithm_name}_prediction'] = prediction
-            print_high(f"Predictions added to deploy_data under column '{self.algorithm_name}_prediction'.")
+            print_high(f"Predictions added to prediction under key '{prediction_id}'.")
         print_low("✅ Prediction complete.")
         return None
 
