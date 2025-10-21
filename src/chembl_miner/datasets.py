@@ -61,6 +61,11 @@ class TrainingData:
         """Creates a DatasetWrapper object from activity_df and descriptors_df obtained from other functions in the pipeline"""
         instance = cls()
         nonfeature_columns = activity_df.columns
+        if descriptors_df.isna().any().any():
+            descriptors_df = descriptors_df.dropna(how="any")
+            n_rows_dropped = activity_df.shape[0] - descriptors_df.shape[0]
+            activity_df = activity_df.loc[descriptors_df.index]
+            print_low(f'There was a NA in descriptors DataFrame, {n_rows_dropped} rows dropped')
         full_df = pd.concat([activity_df, descriptors_df], axis=1)
         print_low("Loading DatasetWrapper object from unsplit dataframes and splitting data.")
         print_high(f"Target column: '{target_column}'")
