@@ -273,12 +273,18 @@ class PredictionData:
         deploy_descriptors,
         model_features,
         ):
-        self.deploy_data = deploy_data
-        self.deploy_descriptors = deploy_descriptors
-        print_high(f"Deployment descriptors shape before alignment: {self.deploy_descriptors.shape}")
+
+        if deploy_descriptors.isna().any().any():
+            deploy_descriptors = deploy_descriptors.dropna(how="any")
+            n_rows_dropped = deploy_data.shape[0] - deploy_descriptors.shape[0]
+            deploy_data = deploy_data.loc[deploy_descriptors.index]
+            print_low(f'There was a NA in descriptors DataFrame, {n_rows_dropped} rows dropped')
+        print_high(f"Deployment descriptors shape before alignment: {deploy_descriptors.shape}")
         try:
-            self.deploy_descriptors = self.deploy_descriptors.loc[:, model_features]
-            print_high(f"Deployment descriptors shape after alignment: {self.deploy_descriptors.shape}")
+            deploy_descriptors = deploy_descriptors.loc[:, model_features]
+            print_high(f"Deployment descriptors shape after alignment: {deploy_descriptors.shape}")
+            self.deploy_data = deploy_data
+            self.deploy_descriptors = deploy_descriptors
         except KeyError as e:
             print("Failed to align with model features.")
             print_low(
