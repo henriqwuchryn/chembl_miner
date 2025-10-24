@@ -6,8 +6,14 @@ from numpy.random import seed
 from scipy.stats import mannwhitneyu
 from sklearn.base import BaseEstimator
 from statsmodels import api as sm
+from rdkit import Chem
+from rdkit.Chem import FilterCatalog
+from rdkit.Chem.rdFingerprintGenerator import GetMorganGenerator
+from rdkit.DataStructs import BulkTanimotoSimilarity
+from rdkit.ML.Cluster import Butina
 
-from .datasets import TrainingData
+from .datasets import TrainingData, PredictionData
+from .utils import print_low, print_high
 
 
 class DataExplorer:
@@ -421,3 +427,159 @@ def mannwhitney_test(col_name: str, molecules_df1, molecules_df2, alpha: float =
     # filename = 'mannwhitneyu_' + descriptor + '.csv'
     # results.to_csv(filename,index=False)
     return results
+
+
+def filter_by_pains(
+    prediction_data: PredictionData,
+    smiles_col: str = 'canonical_smiles',
+    ) -> pd.Series:
+    """
+    Screens molecules in a PredictionData object for PAINS (Pan-Assay Interference Compounds).
+
+    Args:
+        prediction_data (PredictionData): The dataset object containing molecules to screen.
+        smiles_col (str): The name of the column in prediction_data.deploy_data
+                          that contains the SMILES strings. Defaults to 'canonical_smiles'.
+
+    Returns:
+        pd.Series: A boolean Series indexed like deploy_data, where 'True'
+                   indicates the molecule is a potential PAINS compound
+                   and 'False' indicates it is not (or is an invalid SMILES).
+    """
+    if prediction_data.deploy_data.empty:
+        print("PredictionData.deploy_data is empty. Returning an empty Series.")
+        return pd.Series(dtype=bool)
+
+    if smiles_col not in prediction_data.deploy_data.columns:
+        raise ValueError(
+            f"SMILES column '{smiles_col}' not found in prediction_data.deploy_data."
+            )
+
+    print_low(f"Screening {len(prediction_data.deploy_data)} molecules for PAINS.")
+
+    # Initialize the PAINS filter catalog from RDKit
+    params = FilterCatalog.FilterCatalogParams()
+    params.AddCatalog(FilterCatalog.FilterCatalogParams.FilterCatalogs.PAINS)
+    catalog = FilterCatalog.FilterCatalog(params)
+
+    pains_results = []
+    for smiles in prediction_data.deploy_data[smiles_col]:
+        if not smiles or not isinstance(smiles, str):
+            pains_results.append(False)  # Treat invalid/missing SMILES as non-PAINS
+            continue
+
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            pains_results.append(False)  # Treat invalid SMILES as non-PAINS
+            continue
+
+        # Check for matches
+        if catalog.HasMatch(mol):
+            pains_results.append(True)
+        else:
+            pains_results.append(False)
+
+    num_pains = sum(pains_results)
+    print_high(f"Found {num_pains} potential PAINS compounds.")
+    pains_results_series = pd.Series(
+        pains_results,
+        index=prediction_data.deploy_data.index,
+        name="is_pains",
+        )
+
+    prediction_data.deploy_data = prediction_data.deploy_data.join(pains_results_series)
+
+
+
+def assign_molecule_clusters(
+        prediction_data: PredictionData,
+        smiles_col: str = 'canonical_smiles',
+        cluster_col_name: str = 'cluster_id',
+        similarity_cutoff: float = 0.7,
+        radius: int = 2,
+        fingerprint_n_bits: int = 1024,
+) -> None:
+    """
+    Clusters molecules in PredictionData.deploy_data using Butina clustering
+    and assigns a cluster ID to each molecule.
+
+    This function modifies the 'prediction_data.deploy_data' DataFrame in-place
+    by adding a new column with the cluster ID.
+
+    Args:
+        prediction_data (PredictionData): The dataset object to modify.
+        smiles_col (str): The column in deploy_data with SMILES strings.
+        cluster_col_name (str): The name for the new cluster ID column.
+        similarity_cutoff (float): The Tanimoto similarity threshold for
+            clustering (1.0 - distance_cutoff).
+        radius (int): The radius for the Morgan fingerprint.
+        fingerprint_n_bits (int): The number of bits for the Morgan fingerprint.
+    """
+    print_low(f"Assigning molecule clusters to '{cluster_col_name}' column.")
+
+    if smiles_col not in prediction_data.deploy_data.columns:
+        raise ValueError(
+            f"SMILES column '{smiles_col}' not found in prediction_data.deploy_data."
+        )
+
+    data_to_cluster = prediction_data.deploy_data
+    print_high(f"Clustering {len(data_to_cluster)} molecules.")
+
+    # --- 1. Generate Fingerprints ---
+    mols = []
+    valid_indices = []  # To map list index (0,1,2..) back to DataFrame index
+    for idx, smiles in data_to_cluster[smiles_col].items():
+        mol = Chem.MolFromSmiles(smiles)
+        if mol:
+            mols.append(mol)
+            valid_indices.append(idx)
+        else:
+            print_high(f"Warning: Could not parse SMILES at index {idx}. Skipping.")
+
+    if not mols:
+        print_low("No valid molecules found to cluster.")
+        return
+
+    fingerprint_generator = GetMorganGenerator(radius=radius, fpSize=fingerprint_n_bits)
+    fingerprints = fingerprint_generator.GetFingerprints(mols)
+
+    # --- 2. Run Butina Clustering ---
+    distances = []
+    n_mols = len(fingerprints)
+    for i in range(n_mols):
+        similarity_values = BulkTanimotoSimilarity(fingerprints[i], fingerprints[:i])
+        distances.extend([1 - value for value in similarity_values])
+
+    clusters = Butina.ClusterData(
+        distances,
+        n_mols,
+        1.0 - similarity_cutoff,  # Butina uses distance cutoff
+        isDistData=True,
+    )
+    clusters = sorted(clusters, key=len, reverse=True)
+    print_high(f"Clustered {n_mols} valid molecules into {len(clusters)} clusters.")
+
+    # --- 3. Map clusters back to data ---
+    cluster_id_map = {}  # Dict to map {df_index: cluster_id}
+    for cluster_id, mol_indices in enumerate(clusters):
+        original_indices = [valid_indices[i] for i in mol_indices]
+        for original_idx in original_indices:
+            cluster_id_map[original_idx] = cluster_id
+
+    cluster_map_series = pd.Series(cluster_id_map, name=cluster_col_name, dtype='Int64')
+
+    # --- 4. Assign new column in-place ---
+    if cluster_col_name in prediction_data.deploy_data.columns:
+        print_high(f"Warning: Column '{cluster_col_name}' already exists. It will be overwritten.")
+        # Drop old column to prevent join issues
+        prediction_data.deploy_data = prediction_data.deploy_data.drop(
+            columns=[cluster_col_name]
+        )
+
+    # Join the series back to the original dataframe
+    prediction_data.deploy_data = prediction_data.deploy_data.join(cluster_map_series)
+
+    # Note: Molecules with invalid SMILES will have NaN in this new column.
+
+    print_low(f"Cluster assignments complete. Column '{cluster_col_name}' added to deploy_data.")
+    return
