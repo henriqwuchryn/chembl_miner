@@ -2,10 +2,33 @@ from .config import settings
 
 
 def set_verbosity(verbosity_level: int) -> None:
-    """Determines verbosity level.
-    Verbosity of 0 means no output at all, except for erros.
-    Verbosity of 1 means basic output containing information of each step start and end
-    Verbosity of 2 means complete output, containing every information and parameter - Great for logs"""
+    """
+    Sets the global verbosity level for the package.
+
+    - 0: No output except for errors.
+    - 1: Basic output (e.g., step start/end).
+    - 2: Complete output (e.g., parameters, detailed info).
+
+    Args:
+        verbosity_level (int): The verbosity level (0, 1, or 2).
+    
+    Example:
+        ```python
+        from chembl_miner.utils import set_verbosity, print_low
+        
+        # Set verbosity to minimal
+        set_verbosity(1)
+        
+        # This will now print
+        print_low("Pipeline started.")
+        
+        # Set verbosity to off
+        set_verbosity(0)
+        
+        # This will no longer print
+        print_low("Pipeline finished.")
+        ```
+    """
     if 0 <= verbosity_level <= 2:
         settings.verbosity = verbosity_level
     else:
@@ -14,16 +37,70 @@ def set_verbosity(verbosity_level: int) -> None:
 
 
 def print_low(input_string) -> None:
+    """
+    Prints a message if the global verbosity is 1 or 2.
+
+    Args:
+        input_string: The string or object to print.
+    """
+
     if 1 <= settings.verbosity <= 2:
         print(input_string)
 
 
 def print_high(input_string) -> None:
+    """
+    Prints a message only if the global verbosity is 2.
+
+    Args:
+        input_string: The string or object to print.
+    """
+
     if settings.verbosity == 2:
         print(input_string)
 
 
 def _check_kwargs(kwargs: dict, arg: str, default, type_to_check: type = None, optional: bool = True) -> float:
+    """
+    Internal helper to safely get and type-check a value from a kwargs dict.
+
+    Args:
+        kwargs (dict): The kwargs dictionary.
+        arg (str): The key (argument name) to look for.
+        default: The default value to return if `arg` is not in `kwargs`.
+        type_to_check (type, optional): A type (e.g., `float`) to
+            which the value should be cast. Defaults to None.
+        optional (bool, optional): If False, raises a ValueError if `arg`
+            is not in `kwargs`. Defaults to True.
+
+    Returns:
+        The value from `kwargs` (or the default), cast to the
+            specified type.
+    
+    Example:
+        ```python
+        # This is an internal helper function.
+        
+        def my_function(**kwargs):
+            # Get 'alpha', default to 0.5, and ensure it's a float
+            alpha = _check_kwargs(
+                kwargs, 'alpha', 0.5, type_to_check=float
+            )
+            
+            # Get 'n_jobs', default to 1, ensure it's an int
+            n_jobs = _check_kwargs(
+                kwargs, 'n_jobs', 1, type_to_check=int
+            )
+            
+            return alpha, n_jobs
+
+        # Call the function
+        a, n = my_function(alpha="0.25", other_arg=True)
+        # a is 0.25 (as float)
+        # n is 1 (default)
+        ```
+    """
+    
     if type_to_check is not None:
         try:
             default = type_to_check(default)

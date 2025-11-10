@@ -10,12 +10,31 @@ def get_activity_data(
     activity_type: str,
     ) -> pd.DataFrame:
     """
-    Fetches and processes activity data from the ChEMBL database for a given target ID and activity type.
+    Fetches and processes activity data from the ChEMBL database.
+
+    Filters data for a specific target ChEMBL ID and a standard
+    activity type (e.g., "IC50", "Ki").
+
     Args:
-        target_chembl_id (str): The ChEMBL ID of the target.
-        activity_type (str): The type of activity to filter results by.
+        target_chembl_id (str): The ChEMBL ID of the target (e.g., "CHEMBL203").
+        activity_type (str): The type of activity to filter by (e.g., "IC50").
+
     Returns:
-        dataset (pd.DataFrame): A dataframe object containing the processed dataset.
+        pd.DataFrame: A DataFrame containing the filtered activity data.
+    
+    Example:
+        ```python
+        # Fetch IC50 data for Cyclooxygenase-1 (CHEMBL203)
+        target_id = "CHEMBL203"
+        activity_type = "IC50"
+        
+        try:
+            activity_df = get_activity_data(target_id, activity_type)
+            print(f"Fetched {len(activity_df)} records for {target_id}")
+            print(activity_df.head())
+        except Exception as e:
+            print(f"Error fetching data: {e}")
+        ```
     """
     print_low(f"🧪 Fetching '{activity_type}' activity data from ChEMBL for target: {target_chembl_id}")
     activity = new_client.activity  # type: ignore
@@ -48,25 +67,65 @@ def review_assays(
     inner_join: bool = False,
     ) -> list[str] | None:
     """
-    Displays and filter assays from an activity DataFrame.
+    Displays and filters assays from an activity DataFrame.
 
-    Can either include or exclude assays based on keywords found in the
-    'assay_description' column.
+    Prints a summary of the most common assays and can optionally filter
+    this list based on keywords found in the 'assay_description' column.
 
     Args:
         activity_df (pd.DataFrame): DataFrame containing activity data with
-                                    "assay_chembl_id" and "assay_description" columns.
-        max_entries (int): The number of top assays to display. Defaults to 20.
-        assay_keywords (list[str] | None): A list of keywords to filter
-                                           assays by. Defaults to None.
-        exclude_keywords (bool):Use the keywords for exclusion instead of inclusion.
-                                Defaults to False.
-        inner_join (bool): Use inner join instead of outer (AND instead of OR).
-                           Defaults to False.
+            "assay_chembl_id" and "assay_description" columns.
+        max_entries (int, optional): The number of top assays to display in
+            the summary. Defaults to 20.
+        assay_keywords (list[str] | None, optional): A list of keywords to
+            filter assays by. If None, no filtering is done. Defaults to None.
+        exclude_keywords (bool, optional): If True, *excludes* assays
+            containing the keywords. If False, *includes* them. Defaults to False.
+        inner_join (bool, optional): If True, uses "AND" logic for keywords
+            (all must be present). If False, uses "OR" logic (any can be
+            present). Defaults to False.
 
     Returns:
-        List[str] | None: A list of selected assay ChEMBL IDs, or None if no
-                          keywords are provided or an error occurs.
+        list[str] | None: A list of selected assay ChEMBL IDs, or None if
+            no `assay_keywords` are provided.
+    
+    Example:
+        ```python
+        # Assuming 'activity_df' is a DataFrame from get_activity_data()
+        
+        # 1. Just review the top 5 assays without filtering
+        print("--- Reviewing Top 5 Assays ---")
+        review_assays(activity_df, max_entries=5)
+
+        # 2. Filter for assays containing "HEK293" OR "cell"
+        print("\n--- Filtering for 'HEK293' or 'cell' ---")
+        include_list = review_assays(
+            activity_df,
+            max_entries=5,
+            assay_keywords=['HEK293', 'cell']
+        )
+        print(f"Assay IDs to include: {include_list}")
+
+        # 3. Exclude assays containing "mutant" OR "mutated"
+        print("\n--- Excluding 'mutant' or 'mutated' ---")
+        excluded_list = review_assays(
+            activity_df,
+            max_entries=5,
+            assay_keywords=['mutant', 'mutated'],
+            exclude_keywords=True
+        )
+        print(f"Assay IDs after exclusion: {excluded_list}")
+        
+        # 4. Filter for assays containing "human" AND "recombinant"
+        print("\n--- Filtering for 'human' AND 'recombinant' ---")
+        inner_join_list = review_assays(
+            activity_df,
+            max_entries=5,
+            assay_keywords=['human', 'recombinant'],
+            inner_join=True
+        )
+        print(f"Assay IDs with inner join: {inner_join_list}")
+        ```
     """
     assay_info = activity_df.loc[:, ["assay_chembl_id", "assay_description"]]
     unique_assays = len(assay_info.value_counts())
@@ -116,13 +175,28 @@ def filter_by_assay(
     assay_ids: list[str],
     ) -> pd.DataFrame:
     """
-    Filters an activity DataFrame by 'assay_description' column using provided assay_ids.
+    Filters an activity DataFrame to keep only the specified assay IDs.
+
     Args:
         activity_df (pd.DataFrame): DataFrame containing ChEMBL activity data.
-        assay_ids (list[str]): list of assay_chembl_ids obtained from the review_assays function.
+        assay_ids (list[str]): A list of 'assay_chembl_id' values to keep.
 
     Returns:
-        pd.DataFrame:
+        pd.DataFrame: The filtered DataFrame.
+    
+    Example:
+        ```python
+        # Assuming 'activity_df' is a DataFrame from get_activity_data()
+        # and 'assay_id_list' is a list of assay IDs from review_assays()
+        
+        # E.g., assay_id_list = ['CHEMBL123', 'CHEMBL456']
+        
+        print(f"Original dataframe size: {len(activity_df)}")
+        
+        filtered_df = filter_by_assay(activity_df, assay_ids=assay_id_list)
+        
+        print(f"Filtered dataframe size: {len(filtered_df)}")
+        ```
     """
 
     filtered_activity_df = activity_df.loc[

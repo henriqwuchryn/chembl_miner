@@ -17,6 +17,13 @@ from .utils import print_low, print_high, _check_kwargs
 
 
 class ModelPipeline:
+    """
+    A wrapper class for the machine learning modeling pipeline.
+
+    This class handles algorithm setup, hyperparameter optimization
+    (via GASearchCV), model evaluation (via cross-validation), final
+    model fitting, and deployment/prediction.
+    """
 
     def __init__(
         self,
@@ -28,6 +35,39 @@ class ModelPipeline:
         param_grid: dict = None,
         params: dict = None,
         ):
+        """
+        Initializes the ModelPipeline object.
+
+        It's recommended to use the `setup` class method to create
+        and configure an instance.
+
+        Args:
+            algorithm_name (str, optional): Name of the algorithm.
+                Defaults to None.
+            algorithm (BaseEstimator, optional): The unfitted sklearn
+                estimator. Defaults to None.
+            fit_model (BaseEstimator, optional): The fitted model.
+                Defaults to None.
+            applicability_domain_model (OneClassSVM, optional): The fitted
+                applicability domain model. Defaults to None.
+            scoring (dict, optional): Dictionary of sklearn scorers.
+                Defaults to None.
+            param_grid (dict, optional): Parameter grid for optimization.
+                Defaults to None.
+            params (dict, optional): Best parameters found.
+                Defaults to None.
+        
+        Example:
+            ```python
+            from sklearn.ensemble import RandomForestRegressor
+            
+            # This is not the recommended way; use ModelPipeline.setup() instead.
+            pipeline = ModelPipeline(
+                algorithm_name="randomforest_reg",
+                algorithm=RandomForestRegressor()
+            )
+            ```
+        """
         self.algorithm_name = algorithm_name
         self.algorithm = algorithm
         self.fit_model = fit_model
@@ -46,6 +86,51 @@ class ModelPipeline:
         n_jobs: int = -1,
         **scoring_params,
         ):
+        """
+        Sets up and creates a new ModelPipeline instance.
+
+        This is the recommended way to initialize the pipeline.
+
+        Args:
+            algorithm (BaseEstimator | str): An unfitted scikit-learn
+                estimator or a string key for a predefined algorithm
+                (e.g., "xgboost_reg", "randomforest_reg").
+            scoring (dict | str | list[str], optional): Scoring metric(s) to
+                use. Can be a list/str of predefined keys (e.g., "r2", "mae")
+                or a dictionary of custom scorers. Defaults to
+                ["r2", "rmse", "mae"].
+            random_state (int, optional): Random state for reproducibility.
+                Defaults to 42.
+            n_jobs (int, optional): Number of parallel jobs. Defaults to -1.
+            **scoring_params: Additional parameters for scoring functions
+                (e.g., `alpha=0.5` for "quantile" scoring).
+
+        Returns:
+            ModelPipeline: A configured instance of the ModelPipeline.
+        
+        Example:
+            ```python
+            # Set up a pipeline with XGBoost and default scoring
+            ml_pipeline = ModelPipeline.setup(
+                algorithm="xgboost_reg",
+                random_state=42
+            )
+            
+            # Set up with RandomForest and custom scoring
+            ml_pipeline_rf = ModelPipeline.setup(
+                algorithm="randomforest_reg",
+                scoring=["r2", "mae"]
+            )
+            
+            # Set up for quantile regression
+            ml_pipeline_quantile = ModelPipeline.setup(
+                algorithm="lgbm_reg",
+                scoring=["quantile", "mae"],
+                alpha=0.25 # Passed as scoring_param
+            )
+            ```
+        """
+        
         print_low("Setting up MLWrapper object.")
         instance = cls()
         instance._set_algorithm(
@@ -67,11 +152,16 @@ class ModelPipeline:
 
     def to_path(self, file_path: str) -> None:
         """
-        Saves the ModelPipeline object to a file using joblib.
+        Saves the entire ModelPipeline object to a file using dill.
 
         Args:
-            file_path (str): The path to the file where the object will be saved.
-                             It's common to use a '.joblib' or '.pkl' extension.
+            file_path (str): The path to the output file (e.g., 'model.pkl').
+        
+        Example:
+            ```python
+            # Assuming 'ml_pipeline' is a fitted ModelPipeline object
+            ml_pipeline.to_path("my_model_pipeline.pkl")
+            ```
         """
         try:
             print_low(f"Saving ModelPipeline object to {file_path}.")
@@ -86,13 +176,22 @@ class ModelPipeline:
     @staticmethod
     def from_path(file_path: str):
         """
-        Loads a ModelPipeline object from a file using joblib.
+        Loads a ModelPipeline object from a dill file.
 
         Args:
-            file_path (str): The path to the file containing the saved object.
+            file_path (str): The path to the file (e.g., 'model.pkl').
 
         Returns:
             ModelPipeline: The loaded ModelPipeline object.
+        
+        Example:
+            ```python
+            try:
+                loaded_pipeline = ModelPipeline.from_path("my_model_pipeline.pkl")
+                print(loaded_pipeline.algorithm_name)
+            except FileNotFoundError:
+                print("Model file not found.")
+            ```
         """
         try:
             print_low(f"Loading ModelPipeline object from {file_path}...")
@@ -123,6 +222,45 @@ class ModelPipeline:
         n_jobs=-1,
         **kwargs,
         ):
+        """
+        Optimizes model hyperparameters using a genetic algorithm (GASearchCV).
+
+        Args:
+            dataset (TrainingData): The dataset to use for optimization.
+            cv (int, optional): Number of cross-validation folds. Defaults to 3.
+            param_grid (dict | None, optional): A `sklearn-genetic-opt`
+                compatible parameter grid. If None, a predefined grid for the
+                selected `algorithm_name` is used. Defaults to None.
+            refit (str | bool, optional): The scorer name to use for refitting
+                the best model, or True to use the first scorer, or False to
+                not refit. Defaults to True.
+            population_size (int, optional): GA population size. Defaults to 30.
+            generations (int, optional): Number of GA generations. Defaults to 30.
+            n_jobs (int, optional): Number of parallel jobs. Defaults to -1.
+            **kwargs: Additional arguments for GASearchCV (e.g.,
+                `crossover_probability`).
+
+        Returns:
+            GASearchCV: The fitted GASearchCV object.
+        
+        Example:
+            ```python
+            # Assuming 'ml_pipeline' is a setup ModelPipeline
+            # and 'my_dataset' is a populated TrainingData object
+            
+            # Use 'mae' as the metric to refit the best model
+            param_search_results = ml_pipeline.optimize_hyperparameters(
+                dataset=my_dataset,
+                cv=5,
+                refit="mae",
+                population_size=10, # Smaller for quick example
+                generations=5      # Smaller for quick example
+            )
+            
+            print(f"Best params found: {ml_pipeline.params}")
+            ```
+        """
+
         print_low("Starting hyperparameter optimization with GASearchCV (genetic algorithm parameter search).")
         self._check_attributes()
         if dataset.x_train.empty:
@@ -323,6 +461,45 @@ class ModelPipeline:
         params: dict | None = None,
         n_jobs=-1,
         ):
+        """
+        Evaluates the model using N-fold cross-validation.
+
+        Uses the parameters stored in `self.params` (from optimization)
+        unless a new `params` dictionary is provided.
+
+        Args:
+            dataset (TrainingData): The dataset to use for CV.
+            cv (int, optional): Number of cross-validation folds. Defaults to 10.
+            params (dict | None, optional): A parameter dictionary to use.
+                If None, uses `self.params`. Defaults to None.
+            n_jobs (int, optional): Number of parallel jobs. Defaults to -1.
+
+        Returns:
+            dict: The dictionary of results from `sklearn.model_selection.cross_validate`.
+        
+        Example:
+            ```python
+            # Assuming 'ml_pipeline' has optimized parameters in 'ml_pipeline.params'
+            # and 'my_dataset' is a populated TrainingData object
+            
+            cv_results = ml_pipeline.evaluate_model(
+                dataset=my_dataset,
+                cv=10
+            )
+            
+            print(cv_results['test_r2'])
+            # [0.5, 0.45, 0.52, ...]
+            
+            # Or evaluate with a specific set of parameters
+            custom_params = {'n_estimators': 50, 'max_depth': 5}
+            cv_results_custom = ml_pipeline.evaluate_model(
+                dataset=my_dataset,
+                cv=5,
+                params=custom_params
+            )
+            ```
+        """
+
         print_low(f"Starting model evaluation with {cv}-fold cross-validation...")
         self._check_attributes()
         if dataset.x_train.empty:
@@ -354,8 +531,39 @@ class ModelPipeline:
 
     def unpack_cv_results(self, cv_results):
         """
-        Unpacks cv_results into a long-format DataFrame.
+        Converts the results dictionary from `cross_validate` into a
+        long-format DataFrame.
+
+        Args:
+            cv_results (dict): The results dictionary from `evaluate_model`.
+
+        Returns:
+            pd.DataFrame: A DataFrame with columns ['scorer', 'dataset_type',
+                'mean', 'sd'].
+        
+        Example:
+            ```python
+            # Assuming 'cv_results' is from evaluate_model
+            # cv_results = {
+            #     'fit_time': [...],
+            #     'test_r2': [0.5, 0.6],
+            #     'train_r2': [0.9, 0.91],
+            #     'test_mae': [-0.5, -0.4],
+            #     'train_mae': [-0.1, -0.11]
+            # }
+            # ml_pipeline.scoring = {'r2': ..., 'mae': ...} # Must be set
+            
+            results_df = ml_pipeline.unpack_cv_results(cv_results)
+            
+            # print(results_df)
+            #   scorer dataset_type  mean   sd
+            # 0     r2         test  0.55  0.05
+            # 1     r2        train  0.905 0.005
+            # 2    mae         test -0.45  0.05
+            # 3    mae        train -0.105 0.005
+            ```
         """
+
         results_list = []
         for scorer_name in self.scoring.keys():
             test_key = f'test_{scorer_name}' if f'test_{scorer_name}' in cv_results else 'test_score'
@@ -386,6 +594,39 @@ class ModelPipeline:
         dataset: TrainingData,
         params: dict | None = None,
         ):
+        """
+        Fits the final model on the entire training dataset.
+
+        Uses `self.params` unless a `params` dictionary is provided.
+        The fitted model is stored in `self.fit_model`.
+
+        Args:
+            dataset (TrainingData): The dataset to train on.
+            params (dict | None, optional): A parameter dictionary to use.
+                If None, uses `self.params`. Defaults to None.
+
+        Returns:
+            BaseEstimator: The fitted model.
+        
+        Example:
+            ```python
+            # Assuming 'ml_pipeline' has optimized parameters in 'ml_pipeline.params'
+            # and 'my_dataset' is a populated TrainingData object
+            
+            fitted_model = ml_pipeline.fit(dataset=my_dataset)
+            
+            print(ml_pipeline.fit_model)
+            # XGBRegressor(...)
+            
+            # Or fit with custom parameters
+            custom_params = {'n_estimators': 100}
+            fitted_model_custom = ml_pipeline.fit(
+                dataset=my_dataset,
+                params=custom_params
+            )
+            ```
+        """
+
         print_low("Fitting model on the training dataset.")
         self._check_attributes()
         if dataset.x_train.empty:
@@ -409,9 +650,32 @@ class ModelPipeline:
 
     def fit_applicability_domain(self, dataset: TrainingData, **kwargs):
         """
-        Fits a One-Class SVM model to the training data to define the applicability domain.
-        Any additional keyword arguments are passed directly to the OneClassSVM constructor.
+        Fits a One-Class SVM model to define the applicability domain (AD).
+
+        The fitted AD model is stored in `self.applicability_domain_model`.
+
+        Args:
+            dataset (TrainingData): The dataset to use for fitting the AD.
+                The `x_train` features are used.
+            **kwargs: Additional keyword arguments passed to the
+                `OneClassSVM` constructor (e.g., `gamma`, `nu`).
+        
+        Example:
+            ```python
+            # Assuming 'ml_pipeline' is a setup ModelPipeline
+            # and 'my_dataset' is a populated TrainingData object
+            
+            # Fit AD model with a specific kernel and nu
+            ml_pipeline.fit_applicability_domain(
+                dataset=my_dataset,
+                nu=0.1
+            )
+            
+            print(ml_pipeline.applicability_domain_model)
+            # OneClassSVM(nu=0.1)
+            ```
         """
+
         print_low("Fitting Applicability Domain model (OneClassSVM).")
         if dataset.x_train.empty:
             raise ValueError("Training data in the dataset is empty.")
@@ -429,9 +693,38 @@ class ModelPipeline:
         deployment_features: pd.DataFrame,
         ) -> pd.Series:
         """
-        Checks for exact matches between deployment and training feature sets.
-        Returns a boolean Series indicating if a deployment sample is in the training set.
+        Internal helper to check for exact feature matches between train and deploy sets.
+        This function is called by deploy() function.
+
+        Args:
+            training_features (pd.DataFrame): The training features.
+            deployment_features (pd.DataFrame): The deployment features.
+
+        Returns:
+            pd.Series: A boolean Series indicating if a deployment sample
+                was found in the training set.
+        
+        Example:
+            ```python
+            # This is an internal method, typically called by deploy()
+            
+            train_feats = pd.DataFrame({'f1': [1, 2], 'f2': [3, 4]})
+            deploy_feats = pd.DataFrame(
+                {'f1': [5, 1], 'f2': [6, 3]}, 
+                index=['new_mol', 'leaked_mol']
+            )
+            
+            pipeline = ModelPipeline()
+            leakage_series = pipeline._check_training_data_leakage(
+               train_feats, deploy_feats
+            )
+            print(leakage_series)
+            # new_mol       False
+            # leaked_mol     True
+            # Name: is_in_training, dtype: bool
+            ```
         """
+
         print_low("Checking for data leakage from training set...")
         # Convert training dataframe to a set of tuples for efficient comparison
         train_set = set([tuple(row) for row in training_features.values])
@@ -454,6 +747,54 @@ class ModelPipeline:
         training_dataset: TrainingData,
         tag: str = ''
         ):
+        """
+        Deploys the fitted model to make predictions on new data.
+
+        This method:
+        1.  Predicts values using `self.fit_model`.
+        2.  Checks for data leakage (if deploy samples were in the train set).
+        3.  Checks the applicability domain (if `fit_applicability_domain`
+            was run).
+        4.  Stores the results in `deploy_dataset.prediction` dictionary.
+
+        Args:
+            deploy_dataset (PredictionData): The dataset containing new
+                molecules to predict.
+            training_dataset (TrainingData): The original training dataset
+                (used for leakage check).
+            tag (str, optional): An optional tag to append to the
+                prediction key. Defaults to ''.
+
+        Returns:
+            None: The `deploy_dataset` is modified in-place.
+        
+        Example:
+            ```python
+            # Assuming 'ml_pipeline' is fitted (has 'fit_model')
+            # 'my_dataset' is the TrainingData used for fitting
+            # 'my_pred_data' is a populated PredictionData object
+            
+            # Fit AD model first (optional, but recommended)
+            ml_pipeline.fit_applicability_domain(dataset=my_dataset, nu=0.1)
+            
+            # Deploy the model
+            ml_pipeline.deploy(
+                deploy_dataset=my_pred_data,
+                training_dataset=my_dataset,
+                tag="CHEMBL365"
+            )
+            
+            # Results are stored in the PredictionData object
+            print(my_pred_data.prediction.keys())
+            # dict_keys(['xgboost_reg_CHEMBL365_1'])
+            
+            print(my_pred_data.prediction['xgboost_reg_CHEMBL365_1'])
+            #    predicted_values  in_applicability_domain  is_in_training
+            # 0          8.123...                     True           False
+            # 1          7.456...                    False           False
+            ```
+        """
+
         if tag != '':
             tag = f'_{tag}'
         print_low("Deploying model and making predictions...")
@@ -524,6 +865,24 @@ class ModelPipeline:
         random_state: int,
         n_jobs: int,
         ) -> None:
+        """
+        Internal helper to set the algorithm estimator from a string or object.
+        This function is called by setup() function.
+
+        Args:
+            algorithm (str | BaseEstimator): The algorithm to set.
+            random_state (int): The random state.
+            n_jobs (int): The number of parallel jobs.
+        
+        Example:
+            ```python
+            # This is an internal method, typically called by setup()
+            pipeline = ModelPipeline()
+            pipeline._set_algorithm("randomforest_reg", 42, -1)
+            print(pipeline.algorithm)
+            # RandomForestRegressor(n_jobs=-1, random_state=42)
+            ```
+        """
 
         if isinstance(algorithm, str):
             available_algorithms: dict = {
@@ -556,6 +915,30 @@ class ModelPipeline:
         scoring: str | list[str] | dict,  # type: ignore
         alpha: float,
         ) -> None:
+        """
+        Internal helper to set the scoring dictionary.
+        This function is called by setup() function.
+
+        Args:
+            scoring (str | list[str] | dict): The scoring definition.
+            alpha (float): The alpha value for quantile/pinball loss.
+        
+        Example:
+            ```python
+            # This is an internal method, typically called by setup()
+            pipeline = ModelPipeline()
+            
+            # Example 1: Using a list of strings
+            pipeline._set_scoring(["r2", "mae"], alpha=0.5)
+            print(pipeline.scoring.keys())
+            # dict_keys(['r2', 'mae'])
+            
+            # Example 2: Using a quantile
+            pipeline._set_scoring("quantile", alpha=0.75)
+            print(pipeline.scoring.keys())
+            # dict_keys(['quantile'])
+            ```
+        """
 
         if isinstance(scoring, dict):
             self.scoring = scoring
@@ -605,6 +988,21 @@ class ModelPipeline:
         self,
         # check_params: bool = True,
         ):
+        """
+        Internal helper to check if the pipeline is set up.
+
+        Example:
+            ```python
+            # This is an internal method, called by other methods.
+            pipeline = ModelPipeline()
+            try:
+                pipeline._check_attributes()
+            except ValueError as e:
+                print(e)
+            # Algorithm not set. Define algorithm using setup()
+            ```
+        """
+        
         if self.algorithm is None:
             raise ValueError("Algorithm not set. Define algorithm using setup()")
         if self.scoring == {}:

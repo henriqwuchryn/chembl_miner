@@ -18,17 +18,26 @@ from .utils import print_low, print_high
 
 class DataExplorer:
     """
-    A class for performing exploratory data analysis on a dataset.
+    A class for performing exploratory data analysis (EDA) on a TrainingData object.
 
-    It can be initialized from a simple DataFrame or a DatasetWrapper.
+    This class uses the training subset (x_train, y_train) for analysis to
+    avoid leaking information from the test set.
     """
 
 
     def __init__(self, dataset: TrainingData):
         """
-        Constructor method to create an explainer from a DatasetWrapper object.
+        Initializes the DataExplorer.
 
-        Note: This will use the training data (x_train, y_train) for analysis, to avoid leaking data from test subset.
+        Args:
+            dataset (TrainingData): A TrainingData object containing the
+                train/test splits.
+
+        Example:
+            ```python
+            # Assuming 'my_dataset' is a populated TrainingData object
+            explorer = DataExplorer(dataset=my_dataset)
+            ```
         """
         self.general_data = dataset.subset_general_data(train_subset=True)
         self.target = dataset.y_train
@@ -40,6 +49,11 @@ class DataExplorer:
     def plot_target_distribution(self) -> plt.Figure:
         """
         Generates a histogram and KDE plot of the target variable.
+
+        Displays the mean and median as vertical lines.
+
+        Returns:
+            plt.Figure: The Matplotlib Figure object for the plot.
         """
         fig, ax = plt.subplots(figsize=(10, 6))
         sns.histplot(self.target, kde=True, ax=ax, bins=30)
@@ -61,6 +75,11 @@ class DataExplorer:
     def plot_lipinski_descriptors(self) -> plt.Figure:
         """
         Generates box plots for key Lipinski descriptors.
+
+        Plots 'MW', 'LogP', 'NumHDonors', and 'NumHAcceptors'.
+
+        Returns:
+            plt.Figure: The Matplotlib Figure object for the plot.
         """
         lipinski_cols = ['MW', 'LogP', 'NumHDonors', 'NumHAcceptors']
         if not all(col in self.general_data.columns for col in lipinski_cols):
@@ -81,8 +100,13 @@ class DataExplorer:
 
     def plot_ro5_violations_vs_bioactivity(self) -> plt.Figure:
         """
-        Generates a heatmap of the relative frequency of Rule of 5 violations
-        within each bioactivity class.
+        Generates a heatmap of Rule of 5 violations vs. bioactivity class.
+
+        The heatmap shows the relative frequency of violation counts within
+        each bioactivity class ('active', 'intermediate', 'inactive').
+
+        Returns:
+            plt.Figure: The Matplotlib Figure object for the plot.
         """
         required_cols = ['Ro5Violations', 'bioactivity_class']
         if not all(col in self.general_data.columns for col in required_cols):
@@ -114,8 +138,27 @@ class DataExplorer:
         Generates overlapping density plots for specified Lipinski descriptors.
 
         Args:
-            lipinski_descriptors (list[str]): A list of descriptor columns to plot.
-                                               Defaults to ['MW', 'LogP', 'NumHDonors', 'NumHAcceptors'].
+            lipinski_descriptors (list[str], optional): A list of descriptor
+                columns to plot. Defaults to ['MW', 'LogP', 'NumHDonors',
+                'NumHAcceptors'].
+            group_by_bioactivity (bool, optional): If True, plots are colored
+                by the 'bioactivity_class' column. Defaults to True.
+
+        Returns:
+            plt.Figure: The Matplotlib Figure object for the plot.
+
+        Example:
+            ```python
+            explorer = DataExplorer(my_dataset)
+            # Plot default descriptors grouped by bioactivity
+            fig1 = explorer.plot_lipinski_density()
+            
+            # Plot only MW and LogP, not grouped
+            fig2 = explorer.plot_lipinski_density(
+                lipinski_descriptors=['MW', 'LogP'],
+                group_by_bioactivity=False
+            )
+            ```
         """
         if lipinski_descriptors is None:
             lipinski_descriptors = ['MW', 'LogP', 'NumHDonors', 'NumHAcceptors']
@@ -160,7 +203,11 @@ class DataExplorer:
         """
         Generates a scatter plot of Molecular Weight vs. LogP.
 
-        Points are colored by bioactivity class, with lines indicating Ro5 thresholds.
+        Points are colored by bioactivity class, and Rule of 5 thresholds
+        (MW=500, LogP=5) are drawn as dashed lines.
+
+        Returns:
+            plt.Figure: The Matplotlib Figure object for the plot.
         """
         required_cols = ['MW', 'LogP', 'bioactivity_class']
         if not all(col in self.general_data.columns for col in required_cols):
@@ -197,8 +244,25 @@ class DataExplorer:
         """
         Generates a plot of the target variable against a single feature.
 
-        - Scatter plot for numeric features.
-        - Box plot for categorical features.
+        - A scatter plot is used for numeric features (with > 15 unique values).
+        - A box plot is used for categorical features.
+
+        Args:
+            feature_name (str): The name of the feature column to plot.
+
+        Returns:
+            plt.Figure: The Matplotlib Figure object for the plot.
+
+        Example:
+            ```python
+            explorer = DataExplorer(my_dataset)
+            
+            # Plot against a categorical feature (e.g., a fingerprint bit)
+            fig1 = explorer.plot_target_vs_feature(feature_name='PubchemFP10')
+            
+            # Plot against a numeric feature
+            fig2 = explorer.plot_target_vs_feature(feature_name='Ro5Violations')
+            ```
         """
         if feature_name in self.features.columns:
             feature = self.features[feature_name]
@@ -227,6 +291,23 @@ class DataExplorer:
     def plot_correlation_heatmap(self, top_n: int = 15) -> plt.Figure:
         """
         Generates a heatmap of the features most correlated with the target.
+
+        This plot shows the correlation matrix for the top N features
+        (by absolute correlation) and the target variable.
+
+        Args:
+            top_n (int, optional): The number of top features to include
+                in the heatmap. Defaults to 15.
+
+        Returns:
+            plt.Figure: The Matplotlib Figure object for the plot.
+
+        Example:
+            ```python
+            explorer = DataExplorer(my_dataset)
+            fig = explorer.plot_correlation_heatmap(top_n=20)
+            fig.savefig("correlation_heatmap.png")
+            ```
         """
         numeric_features = self.features.select_dtypes(include=np.number)
         df_corr = pd.concat([numeric_features, self.target], axis=1).corr()
@@ -246,7 +327,10 @@ class DataExplorer:
 
 class ModelAnalyzer:
     """
-    A class for explaining and diagnosing a fitted machine learning model.
+    A class for diagnosing and analyzing a fitted machine learning model.
+
+    Generates common diagnostic plots for regression models, such as
+    residuals vs. fitted, Q-Q plots, and actual vs. predicted.
     """
 
 
@@ -258,7 +342,36 @@ class ModelAnalyzer:
         train_subset=True,
         ):
         """
-        Initializes the explainer with a fitted model, DatasetWrapper object and optionally, algorithm_name.
+        Initializes the ModelAnalyzer.
+
+        Args:
+            fit_model (BaseEstimator): A fitted scikit-learn compatible model.
+            dataset (TrainingData): The dataset used for training/testing.
+            algorithm_name (str, optional): A name for the algorithm. If None,
+                the model's class name is used. Defaults to None.
+            train_subset (bool, optional): If True, analysis is performed on
+                the training set. If False, it's performed on the test set.
+                Defaults to True.
+        
+        Example:
+            ```python
+            # Assuming 'my_model' is a fitted model (e.g., from ml.fit_model)
+            # and 'my_dataset' is a TrainingData object.
+            
+            # Analyze performance on the test set
+            analyzer_test = ModelAnalyzer(
+                fit_model=my_model,
+                dataset=my_dataset,
+                train_subset=False 
+            )
+            
+            # Analyze performance on the training set
+            analyzer_train = ModelAnalyzer(
+                fit_model=my_model,
+                dataset=my_dataset,
+                train_subset=True
+            )
+            ```
         """
         self.model = fit_model
         self.dataset = dataset
@@ -286,10 +399,14 @@ class ModelAnalyzer:
 
 
     def plot_residuals_vs_fitted(self) -> plt.Figure:
-        """Generates a Residuals vs. Fitted plot.
+        """
+        Generates a Residuals vs. Fitted plot.
+
+        Used to check for non-linear patterns and heteroscedasticity.
 
         Returns:
-            plt.Figure: The Matplotlib Figure object for the plot."""
+            plt.Figure: The Matplotlib Figure object for the plot.
+        """
         fig, ax = plt.subplots(figsize=(8, 7))
         # ... (plotting code from the previous _plot helper) ...
         sns.residplot(
@@ -306,10 +423,14 @@ class ModelAnalyzer:
 
 
     def plot_qq(self) -> plt.Figure:
-        """Generates a Normal Q-Q plot.
+        """
+        Generates a Normal Q-Q plot.
+
+        Used to check if the residuals are normally distributed.
 
         Returns:
-            plt.Figure: The Matplotlib Figure object for the plot."""
+            plt.Figure: The Matplotlib Figure object for the plot.
+        """
         fig, ax = plt.subplots(figsize=(8, 7))
         # ... (plotting code from the previous _plot helper) ...
         sm.qqplot(self.residuals, line='s', ax=ax, alpha=0.5)
@@ -322,7 +443,10 @@ class ModelAnalyzer:
 
     def plot_scale_location(self) -> plt.Figure:
         """
-        Generates a Scale-Location plot to check for homoscedasticity.
+        Generates a Scale-Location plot.
+
+        Used to check for homoscedasticity (if the variance of residuals
+        is constant across the range of fitted values).
 
         Returns:
             plt.Figure: The Matplotlib Figure object for the plot.
@@ -344,7 +468,10 @@ class ModelAnalyzer:
 
     def plot_actual_vs_predicted(self) -> plt.Figure:
         """
-        Generates an Actual vs. Predicted plot to assess model accuracy.
+        Generates an Actual vs. Predicted plot.
+
+        Used to assess the overall accuracy of the model. A perfect model
+        would have all points on the 'Perfect Fit' line.
 
         Returns:
             plt.Figure: The Matplotlib Figure object for the plot.
@@ -373,8 +500,12 @@ class ModelAnalyzer:
         """
         Generates a bar plot of the top N largest absolute residuals.
 
+        Used to identify specific samples (by their index/ID) that the
+        model struggles to predict accurately.
+
         Args:
-            top_n (int): The number of top residuals to display.
+            top_n (int, optional): The number of top residuals to display.
+                Defaults to 30.
 
         Returns:
             plt.Figure: The Matplotlib Figure object for the plot.
@@ -394,7 +525,9 @@ class ModelAnalyzer:
 
     # TODO: add model explainers such as shap
     def plot_shap_summary(self):
-        """(Future) Generates a SHAP summary plot."""
+        """
+        (Future) Generates a SHAP summary plot.
+        """
         print("SHAP functionality not yet implemented.")
         # import shap
         # explainer = shap.TreeExplainer(self.model)
@@ -404,6 +537,29 @@ class ModelAnalyzer:
 
 
 def mannwhitney_test(col_name: str, molecules_df1, molecules_df2, alpha: float = 0.05):
+    """
+    Performs a Mann-Whitney U test on a specific column from two DataFrames.
+
+    Args:
+        col_name (str): The name of the column to test.
+        molecules_df1 (pd.DataFrame): The first group's data.
+        molecules_df2 (pd.DataFrame): The second group's data.
+        alpha (float, optional): The significance level. Defaults to 0.05.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing the test statistics, p-value,
+            and interpretation.
+    
+    Example:
+        ```python
+        # Create two mock dataframes
+        group_a = pd.DataFrame({'MW': [300, 310, 305, 315]})
+        group_b = pd.DataFrame({'MW': [450, 455, 460, 458]})
+        
+        results = mannwhitney_test('MW', group_a, group_b)
+        print(results)
+        ```
+    """
     # Inspirado em: https://machinelearningmastery.com/nonparametric-statistical-significance-tests-in-python/
     seed(1)
     col1 = molecules_df1[col_name]
@@ -434,17 +590,32 @@ def filter_by_pains(
     smiles_col: str = 'canonical_smiles',
     ) -> pd.Series:
     """
-    Screens molecules in a PredictionData object for PAINS (Pan-Assay Interference Compounds).
+    Screens molecules for PAINS (Pan-Assay Interference Compounds).
+
+    This function modifies `prediction_data.deploy_data` in-place by
+    adding (or overwriting) an 'is_pains' column.
 
     Args:
-        prediction_data (PredictionData): The dataset object containing molecules to screen.
-        smiles_col (str): The name of the column in prediction_data.deploy_data
-                          that contains the SMILES strings. Defaults to 'canonical_smiles'.
+        prediction_data (PredictionData): The dataset object containing
+            molecules to screen.
+        smiles_col (str, optional): The name of the column in
+            `prediction_data.deploy_data` that contains the SMILES strings.
+            Defaults to 'canonical_smiles'.
 
     Returns:
-        pd.Series: A boolean Series indexed like deploy_data, where 'True'
-                   indicates the molecule is a potential PAINS compound
-                   and 'False' indicates it is not (or is an invalid SMILES).
+        pd.Series: A boolean Series where True indicates a potential
+            PAINS compound.
+    
+    Example:
+        ```python
+        # Assuming 'deploy_data' is a PredictionData object
+        # with a 'canonical_smiles' column
+        
+        # This modifies deploy_data.deploy_data in-place
+        pains_series = filter_by_pains(deploy_data)
+        
+        print(deploy_data.deploy_data['is_pains'].value_counts())
+        ```
     """
     if prediction_data.deploy_data.empty:
         print("PredictionData.deploy_data is empty. Returning an empty Series.")
@@ -506,20 +677,37 @@ def assign_molecule_clusters(
         fingerprint_n_bits: int = 1024,
 ) -> None:
     """
-    Clusters molecules in PredictionData.deploy_data using Butina clustering
-    and assigns a cluster ID to each molecule.
+    Clusters molecules using Butina clustering and assigns a cluster ID.
 
-    This function modifies the 'prediction_data.deploy_data' DataFrame in-place
+    This function modifies the `prediction_data.deploy_data` DataFrame in-place
     by adding a new column with the cluster ID.
 
     Args:
         prediction_data (PredictionData): The dataset object to modify.
-        smiles_col (str): The column in deploy_data with SMILES strings.
-        cluster_col_name (str): The name for the new cluster ID column.
-        similarity_cutoff (float): The Tanimoto similarity threshold for
-            clustering (1.0 - distance_cutoff).
-        radius (int): The radius for the Morgan fingerprint.
-        fingerprint_n_bits (int): The number of bits for the Morgan fingerprint.
+        smiles_col (str, optional): The column in `deploy_data` with SMILES
+            strings. Defaults to 'canonical_smiles'.
+        cluster_col_name (str, optional): The name for the new cluster ID
+            column. Defaults to 'cluster_id'.
+        similarity_cutoff (float, optional): The Tanimoto similarity threshold
+            for clustering (1.0 - distance_cutoff). Defaults to 0.7.
+        radius (int, optional): The radius for the Morgan fingerprint.
+            Defaults to 2.
+        fingerprint_n_bits (int, optional): The number of bits for the
+            Morgan fingerprint. Defaults to 1024.
+    
+    Example:
+        ```python
+        # Assuming 'deploy_data' is a PredictionData object
+        # with a 'canonical_smiles' column
+        
+        assign_molecule_clusters(
+            deploy_data,
+            cluster_col_name='scaffold_cluster',
+            similarity_cutoff=0.6
+        )
+        
+        print(deploy_data.deploy_data['scaffold_cluster'].value_counts())
+        ```
     """
     print_low(f"Assigning molecule clusters to '{cluster_col_name}' column.")
 
