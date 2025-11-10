@@ -492,8 +492,8 @@ def filter_by_pains(
         prediction_data.deploy_data = prediction_data.deploy_data.drop(
             columns=["is_pains"]
         )
-
-    prediction_data.deploy_data = prediction_data.deploy_data.join(pains_results_series)
+    prediction_data.deploy_data['is_pains'] = pains_results_series
+    return pains_results_series
 
 
 
@@ -583,7 +583,7 @@ def assign_molecule_clusters(
         )
 
     # Join the series back to the original dataframe
-    prediction_data.deploy_data = prediction_data.deploy_data.join(cluster_map_series)
+    prediction_data.deploy_data[cluster_col_name] = cluster_map_series
 
     # Note: Molecules with invalid SMILES will have NaN in this new column.
 
