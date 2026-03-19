@@ -6,7 +6,7 @@ from sklearn.ensemble import BaggingRegressor, ExtraTreesRegressor, GradientBoos
     HistGradientBoostingRegressor, RandomForestRegressor
 from sklearn.metrics import make_scorer, r2_score, root_mean_squared_error, mean_absolute_error, mean_pinball_loss
 from sklearn.metrics._scorer import _BaseScorer
-from sklearn.model_selection import cross_validate
+from sklearn.model_selection import cross_validate, KFold
 from sklearn.svm import OneClassSVM
 from sklearn_genetic import DeltaThreshold, GASearchCV
 from sklearn_genetic.space import Integer, Continuous, Categorical
@@ -220,6 +220,7 @@ class ModelPipeline:
         population_size: int = 30,
         generations: int = 30,
         n_jobs=-1,
+        random_state=42,
         **kwargs,
         ):
         """
@@ -418,6 +419,7 @@ class ModelPipeline:
         else:
             print_high("Using user-provided parameter grid.")
         try:
+            cv_strat = KFold(n_splits=cv, shuffle=True, random_state=random_state)
             crossover_probability = _check_kwargs(kwargs, 'crossover_probability', 0.2)
             mutation_probability = _check_kwargs(kwargs, 'mutation_probability', 0.8)
             tournament_size = _check_kwargs(kwargs, 'tournament_size', 3)
@@ -426,7 +428,7 @@ class ModelPipeline:
             callback = DeltaThreshold(threshold=0.001, generations=3)
             param_search = GASearchCV(
                 estimator=self.algorithm,
-                cv=cv,
+                cv=cv_strat,
                 param_grid=param_grid,
                 scoring=self.scoring,
                 population_size=population_size,
@@ -459,6 +461,7 @@ class ModelPipeline:
         dataset: TrainingData,
         cv: int = 10,
         params: dict | None = None,
+        random_state=42,
         n_jobs=-1,
         ):
         """
@@ -515,11 +518,12 @@ class ModelPipeline:
             _algorithm = self.algorithm
 
         print_high(f"Model parameters for CV: {_algorithm.get_params()}")
+        cv_strat = KFold(n_splits=cv, shuffle=True, random_state=random_state)
         cv_results = cross_validate(
             estimator=_algorithm,
             X=dataset.x_train,
             y=dataset.y_train,
-            cv=cv,
+            cv=cv_strat,
             scoring=self.scoring,
             n_jobs=n_jobs,
             return_train_score=True,
